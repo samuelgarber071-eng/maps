@@ -3,11 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Navegador de Rotas - Pontos Turísticos e Fronteiras</title>
+    <title>Navegador de Rotas 100% Offline</title>
     
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-
     <style>
         * {
             margin: 0;
@@ -20,18 +17,43 @@
             height: 100%;
             width: 100%;
             overflow: hidden;
+            background-color: #e5e3df;
         }
 
-        #map {
+        /* Área do Mapa */
+        #map-canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             z-index: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
 
-        /* Painel Lateral */
+        /* Imagem de fundo que representa o mapa offline */
+        #offline-map-img {
+            min-width: 100%;
+            min-height: 100%;
+            object-fit: cover;
+            position: absolute;
+        }
+
+        /* SVG para desenhar a rota de forma offline */
+        #route-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Painel Lateral de Rotas */
         .side-panel {
             position: absolute;
             top: 20px;
@@ -49,7 +71,7 @@
 
         .panel-header {
             padding: 20px;
-            background: #1a73e8;
+            background: #202124;
             color: white;
         }
 
@@ -67,7 +89,7 @@
         .input-field {
             display: flex;
             align-items: center;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
             padding: 8px 12px;
             border-radius: 4px;
         }
@@ -87,12 +109,12 @@
         }
 
         .input-field input::placeholder {
-            color: rgba(255, 255, 255, 0.7);
+            color: rgba(255, 255, 255, 0.6);
         }
 
         .btn-route {
-            background: #ffd600;
-            color: #333;
+            background: #1a73e8;
+            color: white;
             border: none;
             padding: 10px;
             border-radius: 4px;
@@ -103,7 +125,7 @@
         }
 
         .btn-route:hover {
-            background: #e6c000;
+            background: #1557b0;
         }
 
         /* Resultados da Viagem */
@@ -123,270 +145,163 @@
         .results p {
             color: #555;
             font-size: 14px;
-        }
-
-        /* Seção de Pontos Turísticos no Painel */
-        .tourist-section {
-            padding: 15px 20px;
-            background: #fff;
-            border-bottom: 1px solid #eee;
-        }
-
-        .tourist-section h3 {
-            font-size: 14px;
-            color: #555;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
             margin-bottom: 10px;
         }
 
-        .tourist-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            max-height: 150px;
+        .instructions-list {
+            padding: 15px;
             overflow-y: auto;
-        }
-
-        .tourist-item {
-            padding: 8px 10px;
-            background: #f1f3f4;
-            border-radius: 4px;
-            font-size: 13px;
+            max-height: 250px;
+            font-size: 14px;
             color: #333;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
-        .tourist-item:hover {
-            background: #e8eaed;
-            color: #1a73e8;
+        .instructions-list li {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #f1f1f1;
+            list-style-type: none;
         }
 
-        /* Instruções de Rota */
-        #instructions {
-            overflow-y: auto;
-            flex-grow: 1;
+        /* Marcadores de Cidade Virtuais */
+        .marker {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #ff0000;
+            border: 3px solid white;
+            border-radius: 50%;
+            z-index: 5;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
-
-        .leaflet-routing-container {
-            width: 100% !important;
-            padding: 10px !important;
-            background: white !important;
-            border: none !important;
-            box-shadow: none !important;
-        }
+        .marker.start { background-color: #0f9d58; }
     </style>
 </head>
 <body>
 
     <div class="side-panel">
         <div class="panel-header">
-            <h2>Planejar Rota & Atrações</h2>
+            <h2>Navegador Offline (Sem Internet)</h2>
             <div class="input-group">
                 <div class="input-field">
                     <span>🟢</span>
-                    <input type="text" id="start" placeholder="Ponto de partida">
+                    <input type="text" id="start" placeholder="Partida (Ex: São Paulo, Rio, BH)">
                 </div>
                 <div class="input-field">
                     <span>🔴</span>
-                    <input type="text" id="end" placeholder="Destino">
+                    <input type="text" id="end" placeholder="Destino (Ex: São Paulo, Rio, BH)">
                 </div>
-                <button class="btn-route" onclick="calcularRota()">Traçar Rota</button>
+                <button class="btn-route" onclick="calcularRotaOffline()">Calcular Rota Local</button>
             </div>
-        </div>
-
-        <div class="tourist-section">
-            <h3>📍 Atrações em Destaque</h3>
-            <div class="tourist-list" id="tourist-shortcut-list">
-                </div>
         </div>
 
         <div class="results" id="results-panel">
             <h3 id="trip-time">0 min</h3>
-            <p id="trip-distance">📍 0 km</p>
+            <p id="trip-distance">🚗 Distância: 0 km</p>
         </div>
 
-        <div id="instructions"></div>
+        <ul class="instructions-list" id="instructions-container"></ul>
     </div>
 
-    <div id="map"></div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <div id="map-canvas">
+        <img id="offline-map-img" src="mapa_fundo.png" alt="[Mapa de fundo offline - Insira uma imagem local 'mapa_fundo.png']" onerror="this.style.backgroundColor='#e5e3df'">
+        
+        <svg id="route-overlay"></svg>
+        <div id="marker-start" class="marker start" style="display: none;"></div>
+        <div id="marker-end" class="marker" style="display: none;"></div>
+    </div>
 
     <script>
-        // Inicializa o mapa com o foco centralizado no Brasil/América do Sul
-        const map = L.map('map').setView([-22.16, -43.29], 10);
+        // BANCO DE DADOS LOCAL (Exemplo interno para funcionar 100% offline)
+        // Mapeia coordenadas em pixels proporcionais da tela para simular o mapa
+        const cidadesDisponiveis = {
+            "sao paulo": { nome: "São Paulo, SP", x: 45, y: 65, lat: -23.55, lon: -46.63 },
+            "rio de janeiro": { nome: "Rio de Janeiro, RJ", x: 60, y: 58, lat: -22.90, lon: -43.17 },
+            "belo horizonte": { nome: "Belo Horizonte, MG", x: 55, y: 45, lat: -19.91, lon: -43.93 },
+            "brasilia": { nome: "Brasília, DF", x: 40, y: 30, lat: -15.78, lon: -47.92 },
+            "curitiba": { nome: "Curitiba, PR", x: 35, y: 75, lat: -25.42, lon: -49.27 }
+        };
 
-        // Mapa Base (CartoDB Voyager) com nomes em português
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap contributors, © CARTO',
-            subdomains: 'abcd',
-            maxZoom: 20
-        }).addTo(map);
+        function calcularRotaOffline() {
+            const buscaPartida = document.getElementById('start').value.toLowerCase().trim();
+            const buscaDestino = document.getElementById('end').value.toLowerCase().trim();
 
-        // --- CAMADA DE FRONTEIRAS EXPRESSAS ---
-        let camadaFronteiras;
-        fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
-            .then(response => response.json())
-            .then(data => {
-                camadaFronteiras = L.geoJSON(data, {
-                    style: function() {
-                        return {
-                            color: '#000000',
-                            weight: 2,
-                            opacity: 0.6,
-                            fillColor: 'transparent',
-                            fillOpacity: 0
-                        };
-                    }
-                }).addTo(map);
-            });
+            const localPartida = cidadesDisponiveis[buscaPartida];
+            const localDestino = cidadesDisponiveis[buscaDestino];
 
-        map.on('zoomend', function() {
-            if (camadaFronteiras) {
-                const zoomAtual = map.getZoom();
-                let novaEspessura = 2;
-                if (zoomAtual > 6) novaEspessura = 1;
-                if (zoomAtual < 4) novaEspessura = 3.5;
-                camadaFronteiras.setStyle({ weight: novaEspessura });
+            if (!localPartida || !localDestino) {
+                alert("Cidade não encontrada no banco offline.\nTente digitar exatamente: Sao Paulo, Rio de Janeiro, Belo Horizonte, Brasilia ou Curitiba.");
+                return;
             }
-        });
 
-        // --- ADIÇÃO: BASE DE DADOS DOS PONTOS TURÍSTICOS ---
-        const pontosTuristicos = [
-            {
-                nome: "Parque das Águas Minerais Salutaris",
-                lat: -22.1642,
-                lon: -43.2975,
-                desc: "Estância hidromineral histórica famosa pelas suas fontes de águas minerais naturais e extensas áreas de lazer."
-            },
-            {
-                nome: "Santuário de Bom Jesus de Matosinhos",
-                lat: -22.1528,
-                lon: -43.2872,
-                desc: "Importante templo religioso e marco de fé que atrai peregrinos durante as tradicionais festas religiosas locais."
-            },
-            {
-                nome: "Museu Sacro-Histórico Tiradentes",
-                lat: -22.1811,
-                lon: -43.3214,
-                desc: "Localizado no distrito histórico de Inconfidência (Sebollas), guarda restos mortais atribuídos a Tiradentes e relíquias do ciclo do café."
-            },
-            {
-                nome: "Antiga Estação Ferroviária",
-                lat: -22.1583,
-                lon: -43.2895,
-                desc: "Património histórico que preserva a memória ferroviária do século XIX e abriga o Museu Ferroviário José Pereira Paliares."
-            },
-            {
-                nome: "Praça do Exército (Praça Marechal Espirito Santo)",
-                lat: -22.1575,
-                lon: -43.2888,
-                desc: "Praça pública marcante decorada com carros de combate e peças de artilharia históricas doados pelo Exército Brasileiro."
-            }
-        ];
+            // 1. Posiciona os marcadores visuais na tela baseado nas coordenadas locais
+            const mStart = document.getElementById('marker-start');
+            mStart.style.left = localPartida.x + "%";
+            mStart.style.top = localPartida.y + "%";
+            mStart.style.display = "block";
 
-        // Renderiza os marcadores e os atalhos no painel
-        const listaAtalhos = document.getElementById('tourist-shortcut-list');
-        
-        pontosTuristicos.forEach(ponto => {
-            // 1. Cria o marcador visual no mapa
-            const marcador = L.marker([ponto.lat, ponto.lon]).addTo(map);
-            marcador.bindPopup(`<b>${ponto.nome}</b><br><span style="font-size:12px; color:#555;">${ponto.desc}</span>`);
+            const mEnd = document.getElementById('marker-end');
+            mEnd.style.left = localDestino.x + "%";
+            mEnd.style.top = localDestino.y + "%";
+            mEnd.style.display = "block";
 
-            // 2. Cria o botão correspondente no menu lateral
-            const itemLista = document.createElement('div');
-            itemLista.className = 'tourist-item';
-            itemLista.innerHTML = `🏛️ <b>${ponto.nome}</b>`;
+            // 2. Desenha a linha da rota usando SVG puro (sem pacotes web)
+            const svg = document.getElementById('route-overlay');
+            const larguraW = window.innerWidth;
+            const alturaH = window.innerHeight;
+
+            const x1 = (localPartida.x / 100) * larguraW;
+            const y1 = (localPartida.y / 100) * alturaH;
+            const x2 = (localDestino.x / 100) * larguraW;
+            const y2 = (localDestino.y / 100) * alturaH;
+
+            svg.innerHTML = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:#1a73e8; stroke-width:6; stroke-linecap:round; opacity:0.8" />`;
+
+            // 3. Fórmula Matemática de Haversine para calcular distância real offline
+            const R = 6371; // Raio da Terra em km
+            const dLat = (localDestino.lat - localPartida.lat) * Math.PI / 180;
+            const dLon = (localDestino.lon - localPartida.lon) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(localPartida.lat * Math.PI / 180) * Math.cos(localDestino.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distanciaReal = R * c; 
+
+            // Adiciona margem de desvio padrão de estradas reais (+25%)
+            const distanciaEstrada = (distanciaReal * 1.25).toFixed(0);
             
-            // Evento ao clicar no item lateral: move o mapa até o local e abre o balão informativo
-            itemLista.onclick = function() {
-                map.setView([ponto.lat, ponto.lon], 15);
-                marcador.openPopup();
-            };
-
-            listaAtalhos.appendChild(itemLista);
-        });
-
-        // --- SISTEMA DE ROTEAMENTO (INALTEADO) ---
-        let controlRoteamento;
-
-        async function buscarCoordenadas(local) {
-            const url = `https://nominatim.openstreetmap.org/search?format=json&accept-language=pt-BR,pt&q=${encodeURIComponent(local)}`;
-            const response = await fetch(url);
-            const data = await response.json();
-            if (data && data.length > 0) {
-                return L.latLng(data[0].lat, data[0].lon);
+            // Calcula tempo baseado em uma velocidade média de 90 km/h
+            const tempoHoras = distanciaEstrada / 90;
+            const minutosTotais = Math.round(tempoHoras * 60);
+            
+            let tempoTexto = "";
+            if (minutosTotais >= 60) {
+                tempoTexto = `${Math.floor(minutosTotais / 60)} h ${minutosTotais % 60} min`;
+            } else {
+                tempoTexto = `${minutosTotais} min`;
             }
-            return null;
+
+            // 4. Atualiza a Interface Gráfica
+            document.getElementById('results-panel').style.display = 'block';
+            document.getElementById('trip-time').innerText = tempoTexto;
+            document.getElementById('trip-distance').innerText = `🚗 Distância estimada: ${distanciaEstrada} km`;
+
+            // Gerador de direções offline explicativas em PT-BR
+            const instruções = document.getElementById('instructions-container');
+            instruções.innerHTML = `
+                <li><b>Início:</b> Saia de ${localPartida.nome} seguindo as placas intermunicipais.</li>
+                <li>Siga pela rodovia principal em direção a seu destino por aproximadamente ${(distanciaEstrada * 0.8).toFixed(0)} km.</li>
+                <li>Mantenha-se à direita na bifurcação acompanhando o fluxo local.</li>
+                <li><b>Chegada:</b> Você entrou em ${localDestino.nome}. Siga o destino final.</li>
+            `;
         }
 
-        async function calcularRota() {
-            const partidaTexto = document.getElementById('start').value;
-            const destinoTexto = document.getElementById('end').value;
-
-            if (!partidaTexto || !destinoTexto) {
-                alert("Por favor, preencha o ponto de partida e o destino.");
-                return;
+        // Corrige o traçado da linha caso o usuário mude o tamanho da janela do navegador
+        window.onresize = function() {
+            if(document.getElementById('results-panel').style.display === 'block') {
+                calcularRotaOffline();
             }
-
-            const pontoPartida = await buscarCoordenadas(partidaTexto);
-            const pontoDestino = await buscarCoordenadas(destinoTexto);
-
-            if (!pontoPartida || !pontoDestino) {
-                alert("Não foi possível encontrar um dos locais informados.");
-                return;
-            }
-
-            if (controlRoteamento) {
-                map.removeControl(controlRoteamento);
-            }
-
-            controlRoteamento = L.Routing.control({
-                waypoints: [pontoPartida, pontoDestino],
-                router: L.Routing.osrmv1({
-                    language: 'pt-BR', 
-                    serviceUrl: 'https://router.project-osrm.org/route/v1'
-                }),
-                lineOptions: {
-                    styles: [{ color: '#1a73e8', weight: 6 }] 
-                },
-                collapsible: true,
-                containerClassName: 'leaflet-routing-container'
-            }).addTo(map);
-
-            const containerInstrucoes = document.getElementById('instructions');
-            containerInstrucoes.innerHTML = '';
-
-            controlRoteamento.on('routeselected', function(e) {
-                const rota = e.route;
-                const distanciaKm = (rota.summary.totalDistance / 1000).toFixed(1);
-                const tempoTotalMinutos = Math.round(rota.summary.totalTime / 60);
-                
-                let tempoFormatado = "";
-                if (tempoTotalMinutos >= 60) {
-                    const horas = Math.floor(tempoTotalMinutos / 60);
-                    const mins = tempoTotalMinutos % 60;
-                    tempoFormatado = `${horas} h ${mins} min`;
-                } else {
-                    tempoFormatado = `${tempoTotalMinutos} min`;
-                }
-
-                document.getElementById('results-panel').style.display = 'block';
-                document.getElementById('trip-time').innerText = tempoFormatado;
-                document.getElementById('trip-distance').innerText = `🚗 Distância calculada: ${distanciaKm} km`;
-                
-                const painelPadrao = document.querySelector('.leaflet-routing-container');
-                if(painelPadrao) {
-                    containerInstrucoes.appendChild(painelPadrao);
-                }
-            });
-        }
+        };
     </script>
 </body>
 </html>

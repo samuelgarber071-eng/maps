@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interface Estilo Maps</title>
+    <title>Navegador de Rotas Estilo Maps</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
     <style>
         * {
             margin: 0;
@@ -18,8 +22,7 @@
             overflow: hidden;
         }
 
-        /* Container do Mapa */
-        #map-container {
+        #map {
             position: absolute;
             top: 0;
             left: 0;
@@ -28,151 +31,234 @@
             z-index: 1;
         }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        /* Barra de Pesquisa Superior */
-        .search-box {
+        /* Painel Lateral de Rotas */
+        .side-panel {
             position: absolute;
             top: 20px;
             left: 20px;
             z-index: 10;
             background: white;
-            padding: 10px 15px;
+            width: 380px;
+            max-height: calc(100% - 40px);
             border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             display: flex;
-            align-items: center;
-            width: 360px;
+            flex-direction: column;
+            overflow: hidden;
         }
 
-        .search-box input {
-            border: none;
-            outline: none;
-            width: 100%;
-            font-size: 16px;
-            margin-right: 10px;
-        }
-
-        .search-box button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 18px;
-        }
-
-        /* Painel Lateral de Informações */
-        .side-panel {
-            position: absolute;
-            top: 90px;
-            left: 20px;
-            z-index: 10;
-            background: white;
-            width: 360px;
-            max-height: calc(100% - 120px);
-            border-radius: 8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            overflow-y: auto;
+        .panel-header {
             padding: 20px;
+            background: #1a73e8;
+            color: white;
         }
 
-        .side-panel h2 {
-            font-size: 20px;
-            color: #333;
-            margin-bottom: 5px;
-        }
-
-        .side-panel p {
-            font-size: 14px;
-            color: #666;
+        .panel-header h2 {
+            font-size: 18px;
             margin-bottom: 15px;
         }
 
-        .actions {
+        .input-group {
             display: flex;
+            flex-direction: column;
             gap: 10px;
-            margin-bottom: 20px;
         }
 
-        .btn-action {
-            flex: 1;
-            padding: 10px;
-            background: #1a73e8;
-            color: white;
-            border: none;
+        .input-field {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
             border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
+        }
+
+        .input-field span {
+            margin-right: 10px;
             font-size: 14px;
         }
 
-        .btn-action:hover {
-            background: #1557b0;
-        }
-
-        /* Botões de Zoom no canto inferior direito */
-        .zoom-controls {
-            position: absolute;
-            bottom: 30px;
-            right: 20px;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .zoom-controls button {
-            width: 40px;
-            height: 40px;
-            background: white;
+        .input-field input {
+            background: transparent;
             border: none;
-            border-radius: 4px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            font-size: 20px;
-            font-weight: bold;
-            color: #555;
-            cursor: pointer;
+            outline: none;
+            color: white;
+            width: 100%;
+            font-size: 15px;
         }
 
-        .zoom-controls button:hover {
-            background: #f1f1f1;
+        .input-field input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .btn-route {
+            background: #ffd600;
+            color: #333;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: background 0.2s;
+        }
+
+        .btn-route:hover {
+            background: #e6c000;
+        }
+
+        /* Resultados da Viagem */
+        .results {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: none; /* Ativado via JS */
+        }
+
+        .results h3 {
+            font-size: 22px;
+            color: #1e7e34;
+            margin-bottom: 5px;
+        }
+
+        .results p {
+            color: #555;
+            font-size: 14px;
+        }
+
+        /* Instruções passo a passo (Oculta o padrão feio do Leaflet e joga no painel) */
+        .leaflet-routing-container {
+            width: 100% !important;
+            padding: 10px !important;
+            background: white !important;
+            border: none !important;
+            box-shadow: none !important;
+            overflow-y: auto;
+            max-height: 300px;
         }
     </style>
 </head>
 <body>
 
-    <div class="search-box">
-        <input type="text" placeholder="Pesquisar no Maps fictício...">
-        <button>🔍</button>
-    </div>
-
     <div class="side-panel">
-        <h2>Localização Selecionada</h2>
-        <p>📍 Avenida Principal, 123 - Centro</p>
-        
-        <div class="actions">
-            <button class="btn-action">Como chegar</button>
-            <button class="btn-action" style="background: #fff; color: #1a73e8; border: 1px solid #dadce0;">Salvar</button>
+        <div class="panel-header">
+            <h2>Planejar Rota (Mapas BR)</h2>
+            <div class="input-group">
+                <div class="input-field">
+                    <span>🟢</span>
+                    <input type="text" id="start" placeholder="Ponto de partida (Ex: São Paulo)">
+                </div>
+                <div class="input-field">
+                    <span>🔴</span>
+                    <input type="text" id="end" placeholder="Destino (Ex: Rio de Janeiro)">
+                </div>
+                <button class="btn-route" onclick="calcularRota()">Traçar Rota</button>
+            </div>
         </div>
 
-        <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 15px;">
+        <div class="results" id="results-panel">
+            <h3 id="trip-time">0 min</h3>
+            <p id="trip-distance">📍 0 km</p>
+        </div>
 
-        <h3>Sobre este lugar</h3>
-        <p style="margin-top: 5px;">Um ponto central de demonstração inspirado no layout clássico de aplicações de mapas modernos.</p>
+        <div id="instructions" style="overflow-y: auto; flex-grow: 1;"></div>
     </div>
 
-    <div class="zoom-controls">
-        <button>+</button>
-        <button>−</button>
-    </div>
+    <div id="map"></div>
 
-    <div id="map-container">
-        <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-43.25%2C-22.95%2C-43.15%2C-22.85&amp;layer=mapnik"></iframe>
-    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
+    <script>
+        // Inicializa o mapa focado no Brasil com nomes em Português
+        const map = L.map('map').setView([-23.5505, -46.6333], 5);
+
+        // Adiciona a camada de mapa configurando explicitamente o idioma padrão do servidor
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            // Força a requisição de tiles locais/traduzidos quando disponíveis
+            locale: 'pt-BR' 
+        }).addTo(map);
+
+        let controlRoteamento;
+
+        // Função para buscar coordenadas (Geocoding) usando o Nominatim (em português)
+        async function buscarCoordenadas(local) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&accept-language=pt-BR&q=${encodeURIComponent(local)}`;
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data && data.length > 0) {
+                return L.latLng(data[0].lat, data[0].lon);
+            }
+            return null;
+        }
+
+        // Função principal que calcula a rota, distância e tempo
+        async function calcularRota() {
+            const partidaTexto = document.getElementById('start').value;
+            const destinoTexto = document.getElementById('end').value;
+
+            if (!partidaTexto || !destinoTexto) {
+                alert("Por favor, preencha o ponto de partida e o destino.");
+                return;
+            }
+
+            const pontoPartida = await buscarCoordenadas(partidaTexto);
+            const pontoDestino = await buscarCoordenadas(destinoTexto);
+
+            if (!pontoPartida || !pontoDestino) {
+                alert("Não foi possível encontrar um dos locais informados. Tente ser mais específico (ex: incluir cidade ou país).");
+                return;
+            }
+
+            // Remove rota anterior se existir
+            if (controlRoteamento) {
+                map.removeControl(controlRoteamento);
+            }
+
+            // Cria a nova rota com instruções traduzidas para PT-BR
+            controlRoteamento = L.Routing.control({
+                waypoints: [pontoPartida, pontoDestino],
+                router: L.Routing.osrmv1({
+                    language: 'pt-BR', // Força as instruções de trânsito em português
+                    serviceUrl: 'https://router.project-osrm.org/route/v1'
+                }),
+                lineOptions: {
+                    styles: [{ color: '#1a73e8', weight: 6 }] // Cor azul estilo Google Maps
+                },
+                collapsible: true,
+                containerClassName: 'leaflet-routing-container'
+            }).addTo(map);
+
+            // Move as instruções de texto para dentro do nosso painel lateral estilizado
+            const containerInstrucoes = document.getElementById('instructions');
+            containerInstrucoes.innerHTML = '';
+            controlRoteamento.on('routeselected', function(e) {
+                const rota = e.route;
+                const distanciaKm = (rota.summary.totalDistance / 1000).toFixed(1);
+                
+                // Conversão do tempo (segundos para horas/minutos)
+                const tempoTotalMinutos = Math.round(rota.summary.totalTime / 60);
+                let tempoFormatado = "";
+                if (tempoTotalMinutos >= 60) {
+                    const horas = Math.floor(tempoTotalMinutos / 60);
+                    const mins = tempoTotalMinutos % 60;
+                    tempoFormatado = `${horas} h ${mins} min`;
+                } else {
+                    tempoFormatado = `${tempoTotalMinutos} min`;
+                }
+
+                // Atualiza o painel de resultados com os dados reais
+                document.getElementById('results-panel').style.display = 'block';
+                document.getElementById('trip-time').innerText = tempoFormatado;
+                document.getElementById('trip-distance').innerText = `🚗 Via de trânsito mais rápida: ${distanciaKm} km`;
+                
+                // Anexa o bloco padrão de texto no nosso container lateral
+                const painelPadrao = document.querySelector('.leaflet-routing-container');
+                if(painelPadrao) {
+                    containerInstrucoes.appendChild(painelPadrao);
+                }
+            });
+        }
+    </script>
 </body>
 </html>

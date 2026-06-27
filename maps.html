@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Navegador de Rotas Traduzido PT-BR</title>
+    <title>Navegador de Rotas - Fronteiras Destacadas</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -31,7 +31,7 @@
             z-index: 1;
         }
 
-        /* Painel Lateral de Rotas */
+        /* Painel Lateral */
         .side-panel {
             position: absolute;
             top: 20px;
@@ -106,7 +106,6 @@
             background: #e6c000;
         }
 
-        /* Resultados da Viagem */
         .results {
             padding: 20px;
             background: #f8f9fa;
@@ -125,7 +124,6 @@
             font-size: 14px;
         }
 
-        /* Customização das instruções */
         .leaflet-routing-container {
             width: 100% !important;
             padding: 10px !important;
@@ -141,15 +139,15 @@
 
     <div class="side-panel">
         <div class="panel-header">
-            <h2>Planejar Rota (Mapas 100% BR)</h2>
+            <h2>Mapas BR com Fronteiras</h2>
             <div class="input-group">
                 <div class="input-field">
                     <span>🟢</span>
-                    <input type="text" id="start" placeholder="Ponto de partida (Ex: Paris)">
+                    <input type="text" id="start" placeholder="Ponto de partida">
                 </div>
                 <div class="input-field">
                     <span>🔴</span>
-                    <input type="text" id="end" placeholder="Destino (Ex: Londres)">
+                    <input type="text" id="end" placeholder="Destino">
                 </div>
                 <button class="btn-route" onclick="calcularRota()">Traçar Rota</button>
             </div>
@@ -169,20 +167,35 @@
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // Inicializa o mapa focado no Brasil, mas pronto para o mundo
-        const map = L.map('map').setView([-23.5505, -46.6333], 4);
+        // Inicializa o mapa mundo
+        const map = L.map('map').setView([-15.0000, -55.0000], 4);
 
-        // ATUALIZADO: Camada de mapa do CartoDB (Voyager) com suporte internacional aprimorado para nomes traduzidos
-        // O servidor do CartoDB prioriza traduções ocidentais/latinas (como o Português) para países e capitais.
+        // Mapa Base Limpo (CartoDB Light) para destacar as linhas pretas das fronteiras
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap contributors, © CARTO',
+            attribution: '© OpenStreetMap, © CARTO',
             subdomains: 'abcd',
             maxZoom: 20
         }).addTo(map);
 
+        // NOVO: Adicionando camada expressa preta nas fronteiras via GeoJSON público
+        fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    style: function() {
+                        return {
+                            color: '#000000',     // Cor Preta
+                            weight: 2.5,          // Espessura da Linha (Aumente se quiser ainda mais forte)
+                            opacity: 0.85,        // Opacidade da linha
+                            fillOpacity: 0.0      // Sem cor de preenchimento interna nos países
+                        };
+                    }
+                }).addTo(map);
+            })
+            .catch(err => console.error("Erro ao carregar fronteiras adicionais:", err));
+
         let controlRoteamento;
 
-        // Busca coordenadas forçando a resposta da busca em Português-BR
         async function buscarCoordenadas(local) {
             const url = `https://nominatim.openstreetmap.org/search?format=json&accept-language=pt-BR,pt&q=${encodeURIComponent(local)}`;
             const response = await fetch(url);
@@ -193,7 +206,6 @@
             return null;
         }
 
-        // Calcula a rota, distância e tempo traduzindo tudo
         async function calcularRota() {
             const partidaTexto = document.getElementById('start').value;
             const destinoTexto = document.getElementById('end').value;
@@ -207,16 +219,14 @@
             const pontoDestino = await buscarCoordenadas(destinoTexto);
 
             if (!pontoPartida || !pontoDestino) {
-                alert("Não foi possível encontrar um dos locais informados. Tente digitar o nome em português (ex: Londres ao invés de London).");
+                alert("Não foi possível encontrar um dos locais informados.");
                 return;
             }
 
-            // Limpa rotas antigas do mapa
             if (controlRoteamento) {
                 map.removeControl(controlRoteamento);
             }
 
-            // Força o motor de rotas a falar em português nas instruções passo a passo
             controlRoteamento = L.Routing.control({
                 waypoints: [pontoPartida, pontoDestino],
                 router: L.Routing.osrmv1({
@@ -224,7 +234,7 @@
                     serviceUrl: 'https://router.project-osrm.org/route/v1'
                 }),
                 lineOptions: {
-                    styles: [{ color: '#1a73e8', weight: 6 }] 
+                    styles: [{ color: '#ff3366', weight: 6 }] // Rota em Rosa/Vermelho para contrastar bem com as linhas pretas
                 },
                 collapsible: true,
                 containerClassName: 'leaflet-routing-container'
@@ -235,12 +245,9 @@
 
             controlRoteamento.on('routeselected', function(e) {
                 const rota = e.route;
-                
-                // Quilometragem formatada
                 const distanciaKm = (rota.summary.totalDistance / 1000).toFixed(1);
-                
-                // Conversão do tempo estimado da rota
                 const tempoTotalMinutos = Math.round(rota.summary.totalTime / 60);
+                
                 let tempoFormatado = "";
                 if (tempoTotalMinutos >= 60) {
                     const horas = Math.floor(tempoTotalMinutos / 60);
@@ -250,12 +257,10 @@
                     tempoFormatado = `${tempoTotalMinutos} min`;
                 }
 
-                // Exibe e atualiza os dados na tela
                 document.getElementById('results-panel').style.display = 'block';
                 document.getElementById('trip-time').innerText = tempoFormatado;
-                document.getElementById('trip-distance').innerText = `🚗 Distância calculada: ${distanciaKm} km`;
+                document.getElementById('trip-distance').innerText = `🚗 Distância: ${distanciaKm} km`;
                 
-                // Move o roteiro textual gerado em PT-BR para o nosso painel
                 const painelPadrao = document.querySelector('.leaflet-routing-container');
                 if(painelPadrao) {
                     containerInstrucoes.appendChild(painelPadrao);

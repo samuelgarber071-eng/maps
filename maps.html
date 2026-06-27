@@ -31,7 +31,7 @@
             z-index: 1;
         }
 
-        /* Painel Lateral */
+        /* Painel Lateral de Rotas */
         .side-panel {
             position: absolute;
             top: 20px;
@@ -106,6 +106,7 @@
             background: #e6c000;
         }
 
+        /* Resultados da Viagem */
         .results {
             padding: 20px;
             background: #f8f9fa;
@@ -124,6 +125,7 @@
             font-size: 14px;
         }
 
+        /* Customização das instruções */
         .leaflet-routing-container {
             width: 100% !important;
             padding: 10px !important;
@@ -139,15 +141,15 @@
 
     <div class="side-panel">
         <div class="panel-header">
-            <h2>Mapas BR com Fronteiras</h2>
+            <h2>Planejar Rota (Fronteiras Marcadas)</h2>
             <div class="input-group">
                 <div class="input-field">
                     <span>🟢</span>
-                    <input type="text" id="start" placeholder="Ponto de partida">
+                    <input type="text" id="start" placeholder="Ponto de partida (Ex: Lisboa)">
                 </div>
                 <div class="input-field">
                     <span>🔴</span>
-                    <input type="text" id="end" placeholder="Destino">
+                    <input type="text" id="end" placeholder="Destino (Ex: Madrid)">
                 </div>
                 <button class="btn-route" onclick="calcularRota()">Traçar Rota</button>
             </div>
@@ -167,32 +169,49 @@
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // Inicializa o mapa mundo
-        const map = L.map('map').setView([-15.0000, -55.0000], 4);
+        // Inicializa o mapa com um zoom mais afastado para ver as fronteiras
+        const map = L.map('map').setView([20, 0], 3);
 
-        // Mapa Base Limpo (CartoDB Light) para destacar as linhas pretas das fronteiras
+        // Mapa Base (CartoDB Voyager) com nomes em português
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap, © CARTO',
+            attribution: '© OpenStreetMap contributors, © CARTO',
             subdomains: 'abcd',
             maxZoom: 20
         }).addTo(map);
 
-        // NOVO: Adicionando camada expressa preta nas fronteiras via GeoJSON público
+        // --- ADIÇÃO: CAMADA DE FRONTEIRAS EXPRESSAS ---
+        let camadaFronteiras;
+
+        // Carrega dados geográficos públicos de fronteiras mundiais
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
             .then(response => response.json())
             .then(data => {
-                L.geoJSON(data, {
-                    style: function() {
+                camadaFronteiras = L.geoJSON(data, {
+                    style: function(feature) {
                         return {
-                            color: '#000000',     // Cor Preta
-                            weight: 2.5,          // Espessura da Linha (Aumente se quiser ainda mais forte)
-                            opacity: 0.85,        // Opacidade da linha
-                            fillOpacity: 0.0      // Sem cor de preenchimento interna nos países
+                            color: '#000000',      // Linha preta bem escura
+                            weight: 2.5,           // Espessura expressiva
+                            opacity: 0.7,          // Opacidade para não cobrir totalmente as estradas litorâneas
+                            fillColor: 'transparent', // Mantém o fundo transparente para ver o mapa original
+                            fillOpacity: 0
                         };
                     }
                 }).addTo(map);
-            })
-            .catch(err => console.error("Erro ao carregar fronteiras adicionais:", err));
+            });
+
+        // Evento que altera a espessura da linha dinamicamente baseado no nível de zoom
+        map.on('zoomend', function() {
+            if (camadaFronteiras) {
+                const zoomAtual = map.getZoom();
+                // Quanto mais perto o zoom, mais fina a linha para manter a precisão; quanto mais longe, mais grossa
+                let novaEspessura = 2.5;
+                if (zoomAtual > 6) novaEspessura = 1.5;
+                if (zoomAtual < 4) novaEspessura = 3.5;
+
+                camadaFronteiras.setStyle({ weight: novaEspessura });
+            }
+        });
+        // ----------------------------------------------
 
         let controlRoteamento;
 
@@ -234,7 +253,7 @@
                     serviceUrl: 'https://router.project-osrm.org/route/v1'
                 }),
                 lineOptions: {
-                    styles: [{ color: '#ff3366', weight: 6 }] // Rota em Rosa/Vermelho para contrastar bem com as linhas pretas
+                    styles: [{ color: '#1a73e8', weight: 6 }] 
                 },
                 collapsible: true,
                 containerClassName: 'leaflet-routing-container'
@@ -259,7 +278,7 @@
 
                 document.getElementById('results-panel').style.display = 'block';
                 document.getElementById('trip-time').innerText = tempoFormatado;
-                document.getElementById('trip-distance').innerText = `🚗 Distância: ${distanciaKm} km`;
+                document.getElementById('trip-distance').innerText = `🚗 Distância calculada: ${distanciaKm} km`;
                 
                 const painelPadrao = document.querySelector('.leaflet-routing-container');
                 if(painelPadrao) {

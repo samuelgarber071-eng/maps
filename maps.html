@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Navegador de Rotas - Fronteiras Destacadas</title>
+    <title>Navegador de Rotas - Pontos Turísticos e Fronteiras</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -31,7 +31,7 @@
             z-index: 1;
         }
 
-        /* Painel Lateral de Rotas */
+        /* Painel Lateral */
         .side-panel {
             position: absolute;
             top: 20px;
@@ -125,15 +125,59 @@
             font-size: 14px;
         }
 
-        /* Customização das instruções */
+        /* Seção de Pontos Turísticos no Painel */
+        .tourist-section {
+            padding: 15px 20px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tourist-section h3 {
+            font-size: 14px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .tourist-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .tourist-item {
+            padding: 8px 10px;
+            background: #f1f3f4;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #333;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tourist-item:hover {
+            background: #e8eaed;
+            color: #1a73e8;
+        }
+
+        /* Instruções de Rota */
+        #instructions {
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
         .leaflet-routing-container {
             width: 100% !important;
             padding: 10px !important;
             background: white !important;
             border: none !important;
             box-shadow: none !important;
-            overflow-y: auto;
-            max-height: 300px;
         }
     </style>
 </head>
@@ -141,18 +185,24 @@
 
     <div class="side-panel">
         <div class="panel-header">
-            <h2>Planejar Rota (Fronteiras Marcadas)</h2>
+            <h2>Planejar Rota & Atrações</h2>
             <div class="input-group">
                 <div class="input-field">
                     <span>🟢</span>
-                    <input type="text" id="start" placeholder="Ponto de partida (Ex: Lisboa)">
+                    <input type="text" id="start" placeholder="Ponto de partida">
                 </div>
                 <div class="input-field">
                     <span>🔴</span>
-                    <input type="text" id="end" placeholder="Destino (Ex: Madrid)">
+                    <input type="text" id="end" placeholder="Destino">
                 </div>
                 <button class="btn-route" onclick="calcularRota()">Traçar Rota</button>
             </div>
+        </div>
+
+        <div class="tourist-section">
+            <h3>📍 Atrações em Destaque</h3>
+            <div class="tourist-list" id="tourist-shortcut-list">
+                </div>
         </div>
 
         <div class="results" id="results-panel">
@@ -160,7 +210,7 @@
             <p id="trip-distance">📍 0 km</p>
         </div>
 
-        <div id="instructions" style="overflow-y: auto; flex-grow: 1;"></div>
+        <div id="instructions"></div>
     </div>
 
     <div id="map"></div>
@@ -169,8 +219,8 @@
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
     <script>
-        // Inicializa o mapa com um zoom mais afastado para ver as fronteiras
-        const map = L.map('map').setView([20, 0], 3);
+        // Inicializa o mapa com o foco centralizado no Brasil/América do Sul
+        const map = L.map('map').setView([-22.16, -43.29], 10);
 
         // Mapa Base (CartoDB Voyager) com nomes em português
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
@@ -179,40 +229,91 @@
             maxZoom: 20
         }).addTo(map);
 
-        // --- ADIÇÃO: CAMADA DE FRONTEIRAS EXPRESSAS ---
+        // --- CAMADA DE FRONTEIRAS EXPRESSAS ---
         let camadaFronteiras;
-
-        // Carrega dados geográficos públicos de fronteiras mundiais
         fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
             .then(response => response.json())
             .then(data => {
                 camadaFronteiras = L.geoJSON(data, {
-                    style: function(feature) {
+                    style: function() {
                         return {
-                            color: '#000000',      // Linha preta bem escura
-                            weight: 2.5,           // Espessura expressiva
-                            opacity: 0.7,          // Opacidade para não cobrir totalmente as estradas litorâneas
-                            fillColor: 'transparent', // Mantém o fundo transparente para ver o mapa original
+                            color: '#000000',
+                            weight: 2,
+                            opacity: 0.6,
+                            fillColor: 'transparent',
                             fillOpacity: 0
                         };
                     }
                 }).addTo(map);
             });
 
-        // Evento que altera a espessura da linha dinamicamente baseado no nível de zoom
         map.on('zoomend', function() {
             if (camadaFronteiras) {
                 const zoomAtual = map.getZoom();
-                // Quanto mais perto o zoom, mais fina a linha para manter a precisão; quanto mais longe, mais grossa
-                let novaEspessura = 2.5;
-                if (zoomAtual > 6) novaEspessura = 1.5;
+                let novaEspessura = 2;
+                if (zoomAtual > 6) novaEspessura = 1;
                 if (zoomAtual < 4) novaEspessura = 3.5;
-
                 camadaFronteiras.setStyle({ weight: novaEspessura });
             }
         });
-        // ----------------------------------------------
 
+        // --- ADIÇÃO: BASE DE DADOS DOS PONTOS TURÍSTICOS ---
+        const pontosTuristicos = [
+            {
+                nome: "Parque das Águas Minerais Salutaris",
+                lat: -22.1642,
+                lon: -43.2975,
+                desc: "Estância hidromineral histórica famosa pelas suas fontes de águas minerais naturais e extensas áreas de lazer."
+            },
+            {
+                nome: "Santuário de Bom Jesus de Matosinhos",
+                lat: -22.1528,
+                lon: -43.2872,
+                desc: "Importante templo religioso e marco de fé que atrai peregrinos durante as tradicionais festas religiosas locais."
+            },
+            {
+                nome: "Museu Sacro-Histórico Tiradentes",
+                lat: -22.1811,
+                lon: -43.3214,
+                desc: "Localizado no distrito histórico de Inconfidência (Sebollas), guarda restos mortais atribuídos a Tiradentes e relíquias do ciclo do café."
+            },
+            {
+                nome: "Antiga Estação Ferroviária",
+                lat: -22.1583,
+                lon: -43.2895,
+                desc: "Património histórico que preserva a memória ferroviária do século XIX e abriga o Museu Ferroviário José Pereira Paliares."
+            },
+            {
+                nome: "Praça do Exército (Praça Marechal Espirito Santo)",
+                lat: -22.1575,
+                lon: -43.2888,
+                desc: "Praça pública marcante decorada com carros de combate e peças de artilharia históricas doados pelo Exército Brasileiro."
+            }
+        ];
+
+        // Renderiza os marcadores e os atalhos no painel
+        const listaAtalhos = document.getElementById('tourist-shortcut-list');
+        
+        pontosTuristicos.forEach(ponto => {
+            // 1. Cria o marcador visual no mapa
+            const marcador = L.marker([ponto.lat, ponto.lon]).addTo(map);
+            marcador.bindPopup(`<b>${ponto.nome}</b><br><span style="font-size:12px; color:#555;">${ponto.desc}</span>`);
+
+            // 2. Cria o botão correspondente no menu lateral
+            const itemLista = document.createElement('div');
+            itemLista.className = 'tourist-item';
+            itemLista.innerHTML = `🏛️ <b>${ponto.nome}</b>`;
+            
+            // Evento ao clicar no item lateral: move o mapa até o local e abre o balão informativo
+            itemLista.onclick = function() {
+                map.setView([ponto.lat, ponto.lon], 15);
+                marcador.openPopup();
+            };
+
+            listaAtalhos.appendChild(itemLista);
+        });
+
+        // --- SISTEMA DE ROTEAMENTO (INALTEADO) ---
         let controlRoteamento;
 
         async function buscarCoordenadas(local) {

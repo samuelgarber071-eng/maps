@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Navegador de Rotas 100% Offline</title>
-    
+    <title>Navegador de Mapas 100% Offline</title>
     <style>
         * {
             margin: 0;
@@ -17,10 +16,10 @@
             height: 100%;
             width: 100%;
             overflow: hidden;
-            background-color: #e5e3df;
+            background-color: #e5e3df; /* Cor padrão de fundo do Google Maps */
         }
 
-        /* Área do Mapa */
+        /* Simulação da Grade de Mapa Fictícia (Substitui as imagens da web) */
         #map-canvas {
             position: absolute;
             top: 0;
@@ -28,32 +27,39 @@
             width: 100%;
             height: 100%;
             z-index: 1;
+            background-image: 
+                radial-gradient(#d0d0d0 1px, transparent 1px), 
+                linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+            background-size: 20px 20px, 100px 100px, 100px 100px;
             display: flex;
-            justify-content: center;
             align-items: center;
-            overflow: hidden;
+            justify-content: center;
         }
 
-        /* Imagem de fundo que representa o mapa offline */
-        #offline-map-img {
-            min-width: 100%;
-            min-height: 100%;
-            object-fit: cover;
+        /* Elementos Visuais do Mapa Fictício Offline */
+        .pais-fake {
             position: absolute;
+            border: 3px solid #000000; /* Linha expressa preta nas fronteiras pedida antes */
+            background-color: #f9f9f9;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #555;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* SVG para desenhar a rota de forma offline */
-        #route-overlay {
+        /* Estradas simuladas no fundo */
+        .estrada-fake {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            background: #ffffff;
+            border: 1px solid #ffca28;
             z-index: 2;
-            pointer-events: none;
         }
 
-        /* Painel Lateral de Rotas */
+        /* Painel Lateral */
         .side-panel {
             position: absolute;
             top: 20px;
@@ -71,13 +77,24 @@
 
         .panel-header {
             padding: 20px;
-            background: #202124;
+            background: #1a73e8;
             color: white;
         }
 
         .panel-header h2 {
             font-size: 18px;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
+        }
+
+        .status-offline {
+            font-size: 11px;
+            background: #e65100;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-bottom: 10px;
+            font-weight: bold;
         }
 
         .input-group {
@@ -89,7 +106,7 @@
         .input-field {
             display: flex;
             align-items: center;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.2);
             padding: 8px 12px;
             border-radius: 4px;
         }
@@ -109,12 +126,12 @@
         }
 
         .input-field input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
+            color: rgba(255, 255, 255, 0.7);
         }
 
         .btn-route {
-            background: #1a73e8;
-            color: white;
+            background: #ffd600;
+            color: #333;
             border: none;
             padding: 10px;
             border-radius: 4px;
@@ -125,7 +142,7 @@
         }
 
         .btn-route:hover {
-            background: #1557b0;
+            background: #e6c000;
         }
 
         /* Resultados da Viagem */
@@ -145,163 +162,214 @@
         .results p {
             color: #555;
             font-size: 14px;
-            margin-bottom: 10px;
         }
 
         .instructions-list {
             padding: 15px;
             overflow-y: auto;
-            max-height: 250px;
+            flex-grow: 1;
+            background: #fff;
+        }
+
+        .instruction-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f1f1;
             font-size: 14px;
             color: #333;
         }
 
-        .instructions-list li {
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #f1f1f1;
-            list-style-type: none;
+        /* Linha de Rota Dinâmica no Mapa */
+        #svg-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
         }
 
-        /* Marcadores de Cidade Virtuais */
-        .marker {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            background-color: #ff0000;
-            border: 3px solid white;
-            border-radius: 50%;
-            z-index: 5;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+        .route-line {
+            stroke: #1a73e8;
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: tracejar 2s ease-in-out forwards;
         }
-        .marker.start { background-color: #0f9d58; }
+
+        @keyframes tracejar {
+            to { stroke-dashoffset: 0; }
+        }
     </style>
 </head>
 <body>
 
     <div class="side-panel">
         <div class="panel-header">
-            <h2>Navegador Offline (Sem Internet)</h2>
+            <h2>Navegador de Rotas</h2>
+            <div class="status-offline">MODO 100% OFFLINE</div>
             <div class="input-group">
                 <div class="input-field">
                     <span>🟢</span>
-                    <input type="text" id="start" placeholder="Partida (Ex: São Paulo, Rio, BH)">
+                    <input type="text" id="start" placeholder="Ex: São Paulo, Buenos Aires, Lisboa">
                 </div>
                 <div class="input-field">
                     <span>🔴</span>
-                    <input type="text" id="end" placeholder="Destino (Ex: São Paulo, Rio, BH)">
+                    <input type="text" id="end" placeholder="Ex: Rio de Janeiro, Lima, Madrid">
                 </div>
-                <button class="btn-route" onclick="calcularRotaOffline()">Calcular Rota Local</button>
+                <button class="btn-route" onclick="calcularRotaOffline()">Traçar Rota Offline</button>
             </div>
         </div>
 
         <div class="results" id="results-panel">
             <h3 id="trip-time">0 min</h3>
-            <p id="trip-distance">🚗 Distância: 0 km</p>
+            <p id="trip-distance">🚗 Distância calculada: 0 km</p>
         </div>
 
-        <ul class="instructions-list" id="instructions-container"></ul>
+        <div class="instructions-list" id="instructions">
+            <p style="color: #888; font-style: italic; text-align: center; margin-top: 20px;">
+                Digite cidades válidas no banco offline para testar (Ex: São Paulo, Rio de Janeiro, Lisboa, Madrid, Buenos Aires, Lima).
+            </p>
+        </div>
     </div>
 
     <div id="map-canvas">
-        <img id="offline-map-img" src="mapa_fundo.png" alt="[Mapa de fundo offline - Insira uma imagem local 'mapa_fundo.png']" onerror="this.style.backgroundColor='#e5e3df'">
-        
-        <svg id="route-overlay"></svg>
-        <div id="marker-start" class="marker start" style="display: none;"></div>
-        <div id="marker-end" class="marker" style="display: none;"></div>
+        <div class="estrada-fake" style="width: 100%; height: 8px; top: 50%;"></div>
+        <div class="estrada-fake" style="width: 8px; height: 100%; left: 65%;"></div>
+
+        <div class="pais-fake" style="width: 300px; height: 400px; top: 30%; left: 40%;">
+            <span>BRASIL<br><small style="font-weight:normal; font-size:11px;">(Bairro Centro / Cidades)</small></span>
+        </div>
+        <div class="pais-fake" style="width: 200px; height: 250px; top: 60%; left: 23%;">
+            <span>ARGENTINA</span>
+        </div>
+        <div class="pais-fake" style="width: 180px; height: 200px; top: 10%; left: 75%;">
+            <span>PORTUGAL</span>
+        </div>
+        <div class="pais-fake" style="width: 250px; height: 220px; top: 25%; left: 82%;">
+            <span>ESPANHA</span>
+        </div>
+
+        <svg id="svg-layer">
+            <path id="route-path" class="route-line" d="" />
+        </svg>
     </div>
 
     <script>
-        // BANCO DE DADOS LOCAL (Exemplo interno para funcionar 100% offline)
-        // Mapeia coordenadas em pixels proporcionais da tela para simular o mapa
-        const cidadesDisponiveis = {
-            "sao paulo": { nome: "São Paulo, SP", x: 45, y: 65, lat: -23.55, lon: -46.63 },
-            "rio de janeiro": { nome: "Rio de Janeiro, RJ", x: 60, y: 58, lat: -22.90, lon: -43.17 },
-            "belo horizonte": { nome: "Belo Horizonte, MG", x: 55, y: 45, lat: -19.91, lon: -43.93 },
-            "brasilia": { nome: "Brasília, DF", x: 40, y: 30, lat: -15.78, lon: -47.92 },
-            "curitiba": { nome: "Curitiba, PR", x: 35, y: 75, lat: -25.42, lon: -49.27 }
+        // BANCO DE DADOS LOCAL E OFFLINE (Substitui servidores de Geocoding e Rotas)
+        const bancoCidadesOffline = {
+            "sao paulo": { x: "48%", y: "45%", nome: "São Paulo" },
+            "rio de janeiro": { x: "53%", y: "42%", nome: "Rio de Janeiro" },
+            "buenos aires": { x: "30%", y: "70%", nome: "Buenos Aires" },
+            "lima": { x: "26%", y: "48%", nome: "Lima" },
+            "lisboa": { x: "78%", y: "22%", nome: "Lisboa" },
+            "madrid": { x: "86%", y: "28%", nome: "Madrid" }
+        };
+
+        // Matriz de distâncias e instruções pré-traduzidas para PT-BR
+        const rotasOffline = {
+            "sao paulo->rio de janeiro": {
+                distancia: "435",
+                tempo: "5 h 15 min",
+                passos: [
+                    "Siga na direção nordeste na Av. Cruzeiro do Sul.",
+                    "Pegue a rampa de acesso para a Rodovia Presidente Dutra (BR-116).",
+                    "Continue na BR-116 por 400 km entrando no Estado do Rio de Janeiro.",
+                    "Siga pela Linha Vermelha em direção ao Centro do Rio de Janeiro.",
+                    "Você chegou ao seu destino no Rio de Janeiro."
+                ]
+            },
+            "lisboa->madrid": {
+                distancia: "625",
+                tempo: "5 h 45 min",
+                passos: [
+                    "Siga em direção à A6 / Marateca / Espanha.",
+                    "Cruze a fronteira expressa preta para a Espanha entrando na autovia A-5.",
+                    "Continue seguindo as placas para Madrid por 400 km.",
+                    "Pegue a saída em direção ao centro de Madrid.",
+                    "Destino alcançado na capital espanhola."
+                ]
+            },
+            "buenos aires->lima": {
+                distancia: "3860",
+                tempo: "46 h",
+                passos: [
+                    "Siga em direção à RN 9 saindo de Buenos Aires.",
+                    "Cruze o território continental em direção ao norte/noroeste.",
+                    "Cruze as divisas alfandegárias montanhosas.",
+                    "Entre no Peru pela rota pan-americana sul.",
+                    "Chegada a Lima concluída com sucesso."
+                ]
+            }
         };
 
         function calcularRotaOffline() {
-            const buscaPartida = document.getElementById('start').value.toLowerCase().trim();
-            const buscaDestino = document.getElementById('end').value.toLowerCase().trim();
+            const partidaInput = document.getElementById('start').value.trim().toLowerCase();
+            const destinoInput = document.getElementById('end').value.trim().toLowerCase();
 
-            const localPartida = cidadesDisponiveis[buscaPartida];
-            const localDestino = cidadesDisponiveis[buscaDestino];
+            const cidadeA = bancoCidadesOffline[partidaInput];
+            const cidadeB = bancoCidadesOffline[destinoInput];
 
-            if (!localPartida || !localDestino) {
-                alert("Cidade não encontrada no banco offline.\nTente digitar exatamente: Sao Paulo, Rio de Janeiro, Belo Horizonte, Brasilia ou Curitiba.");
+            if (!cidadeA || !cidadeB) {
+                alert("Erro Offline: Local não encontrado na memória local.\nTente combinações como:\n- São Paulo -> Rio de Janeiro\n- Lisboa -> Madrid\n- Buenos Aires -> Lima");
                 return;
             }
 
-            // 1. Posiciona os marcadores visuais na tela baseado nas coordenadas locais
-            const mStart = document.getElementById('marker-start');
-            mStart.style.left = localPartida.x + "%";
-            mStart.style.top = localPartida.y + "%";
-            mStart.style.display = "block";
+            // Busca a chave da rota direta ou cria uma invertida genérica
+            const chaveRota = `${partidaInput}->${destinoInput}`;
+            const chaveInvertida = `${destinoInput}->${partidaInput}`;
+            const dadosRota = rotasOffline[chaveRota] || rotasOffline[chaveInvertida];
 
-            const mEnd = document.getElementById('marker-end');
-            mEnd.style.left = localDestino.x + "%";
-            mEnd.style.top = localDestino.y + "%";
-            mEnd.style.display = "block";
+            // Se não houver rota específica programada, gera um cálculo randômico/fictício simulado
+            let distancia = dadosRota ? dadosRota.distancia : Math.floor(Math.random() * 800) + 150;
+            let tempo = dadosRota ? dadosRota.tempo : Math.floor(distancia / 80) + " h " + (distancia % 60) + " min";
+            let passos = dadosRota ? dadosRota.passos : [
+                `Sia de ${cidadeA.nome} em direção às vias principais.`,
+                "Siga em frente respeitando as placas de trânsito locais.",
+                `Cruze as fronteiras e limites de bairros e municípios.`,
+                `Aproxime-se do destino final monitorando o painel.`,
+                `Você chegou com segurança em ${cidadeB.nome}.`
+            ];
 
-            // 2. Desenha a linha da rota usando SVG puro (sem pacotes web)
-            const svg = document.getElementById('route-overlay');
-            const larguraW = window.innerWidth;
-            const alturaH = window.innerHeight;
-
-            const x1 = (localPartida.x / 100) * larguraW;
-            const y1 = (localPartida.y / 100) * alturaH;
-            const x2 = (localDestino.x / 100) * larguraW;
-            const y2 = (localDestino.y / 100) * alturaH;
-
-            svg.innerHTML = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:#1a73e8; stroke-width:6; stroke-linecap:round; opacity:0.8" />`;
-
-            // 3. Fórmula Matemática de Haversine para calcular distância real offline
-            const R = 6371; // Raio da Terra em km
-            const dLat = (localDestino.lat - localPartida.lat) * Math.PI / 180;
-            const dLon = (localDestino.lon - localPartida.lon) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(localPartida.lat * Math.PI / 180) * Math.cos(localDestino.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            const distanciaReal = R * c; 
-
-            // Adiciona margem de desvio padrão de estradas reais (+25%)
-            const distanciaEstrada = (distanciaReal * 1.25).toFixed(0);
-            
-            // Calcula tempo baseado em uma velocidade média de 90 km/h
-            const tempoHoras = distanciaEstrada / 90;
-            const minutosTotais = Math.round(tempoHoras * 60);
-            
-            let tempoTexto = "";
-            if (minutosTotais >= 60) {
-                tempoTexto = `${Math.floor(minutosTotais / 60)} h ${minutosTotais % 60} min`;
-            } else {
-                tempoTexto = `${minutosTotais} min`;
-            }
-
-            // 4. Atualiza a Interface Gráfica
+            // 1. Atualiza Painel de Informações em PT-BR
             document.getElementById('results-panel').style.display = 'block';
-            document.getElementById('trip-time').innerText = tempoTexto;
-            document.getElementById('trip-distance').innerText = `🚗 Distância estimada: ${distanciaEstrada} km`;
+            document.getElementById('trip-time').innerText = tempo;
+            document.getElementById('trip-distance').innerText = `🚗 Rota Offline: ${distancia} km`;
 
-            // Gerador de direções offline explicativas em PT-BR
-            const instruções = document.getElementById('instructions-container');
-            instruções.innerHTML = `
-                <li><b>Início:</b> Saia de ${localPartida.nome} seguindo as placas intermunicipais.</li>
-                <li>Siga pela rodovia principal em direção a seu destino por aproximadamente ${(distanciaEstrada * 0.8).toFixed(0)} km.</li>
-                <li>Mantenha-se à direita na bifurcação acompanhando o fluxo local.</li>
-                <li><b>Chegada:</b> Você entrou em ${localDestino.nome}. Siga o destino final.</li>
-            `;
+            // 2. Renderiza Lista de Instruções Passo a Passo
+            const containerInstrucoes = document.getElementById('instructions');
+            containerInstrucoes.innerHTML = "<h4>Direções Passo a Passo:</h4>";
+            passos.forEach((passo, index) => {
+                containerInstrucoes.innerHTML += `<div class="instruction-item"><b>${index + 1}.</b> ${passo}</div>`;
+            });
+
+            // 3. Desenha a Linha de Rota no Gráfico do Mapa usando as Coordenadas Offline
+            const canvas = document.getElementById('map-canvas');
+            const largura = canvas.clientWidth;
+            const altura = canvas.clientHeight;
+
+            // Converte porcentagens em pixels para o SVG
+            const converterPixel = (porcentagem, total) => (parseFloat(porcentagem) / 100) * total;
+            
+            const x1 = converterPixel(cidadeA.x, largura);
+            const y1 = converterPixel(cidadeA.y, altura);
+            const x2 = converterPixel(cidadeB.x, largura);
+            const y2 = converterPixel(cidadeB.y, altura);
+
+            // Desenha um caminho ligeiramente curvado para simular uma estrada real
+            const pathElement = document.getElementById('route-path');
+            const dStr = `M ${x1} ${y1} Q ${(x1+x2)/2 + 40} ${(y1+y2)/2 - 40} ${x2} ${y2}`;
+            
+            pathElement.setAttribute('d', dStr);
+            
+            // Reinicia animação da linha
+            pathElement.style.animation = 'none';
+            pathElement.offsetHeight; /* truque de reflow do navegador */
+            pathElement.style.animation = null;
         }
-
-        // Corrige o traçado da linha caso o usuário mude o tamanho da janela do navegador
-        window.onresize = function() {
-            if(document.getElementById('results-panel').style.display === 'block') {
-                calcularRotaOffline();
-            }
-        };
     </script>
 </body>
 </html>

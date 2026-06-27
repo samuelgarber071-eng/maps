@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interface Estilo Maps</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body, html {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        /* Container do Mapa */
+        #map-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Barra de Pesquisa Superior */
+        .search-box {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            width: 360px;
+        }
+
+        .search-box input {
+            border: none;
+            outline: none;
+            width: 100%;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+
+        .search-box button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Painel Lateral de Informações */
+        .side-panel {
+            position: absolute;
+            top: 90px;
+            left: 20px;
+            z-index: 10;
+            background: white;
+            width: 360px;
+            max-height: calc(100% - 120px);
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .side-panel h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .side-panel p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: 10px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .btn-action:hover {
+            background: #1557b0;
+        }
+
+        /* Botões de Zoom no canto inferior direito */
+        .zoom-controls {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .zoom-controls button {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            font-size: 20px;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+        }
+
+        .zoom-controls button:hover {
+            background: #f1f1f1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="search-box">
+        <input type="text" placeholder="Pesquisar no Maps fictício...">
+        <button>🔍</button>
+    </div>
+
+    <div class="side-panel">
+        <h2>Localização Selecionada</h2>
+        <p>📍 Avenida Principal, 123 - Centro</p>
+        
+        <div class="actions">
+            <button class="btn-action">Como chegar</button>
+            <button class="btn-action" style="background: #fff; color: #1a73e8; border: 1px solid #dadce0;">Salvar</button>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 15px;">
+
+        <h3>Sobre este lugar</h3>
+        <p style="margin-top: 5px;">Um ponto central de demonstração inspirado no layout clássico de aplicações de mapas modernos.</p>
+    </div>
+
+    <div class="zoom-controls">
+        <button>+</button>
+        <button>−</button>
+    </div>
+
+    <div id="map-container">
+        <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-43.25%2C-22.95%2C-43.15%2C-22.85&amp;layer=mapnik"></iframe>
+    </div>
+
+</body>
+</html>

@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sygic - GPS Offline Mode</title>
+    <title>Sygic - Roteamento A para B</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
     <style>
         :root {
@@ -66,7 +67,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Indicador de Modo Offline */
         .offline-badge {
             background-color: var(--sygic-green);
             color: var(--sygic-dark-blue);
@@ -84,7 +84,24 @@
             z-index: 1;
         }
 
-        /* Customização dos controles do Leaflet */
+        /* Instruções do Leaflet Routing Machine */
+        .leaflet-routing-container {
+            position: absolute !important;
+            bottom: 15px !important;
+            left: 15px !important;
+            right: 15px !important;
+            max-width: 400px !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            border-radius: 10px !important;
+            padding: 5px !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2) !important;
+            max-height: 120px !important;
+            overflow-y: auto !important;
+            font-size: 12px !important;
+            z-index: 9999 !important;
+        }
+
+        /* Customização dos controles de Zoom */
         .leaflet-control-zoom {
             border: none !important;
             border-radius: 10px !important;
@@ -103,7 +120,7 @@
             background-color: var(--sygic-blue) !important;
         }
 
-        /* Banner de Navegação */
+        /* Banner de Instrução flutuante (Simulação HUD Sygic) */
         .nav-banner {
             position: absolute;
             top: 20px;
@@ -116,7 +133,7 @@
             display: flex;
             align-items: center;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            z-index: 999;
+            z-index: 9999;
         }
 
         .nav-icon {
@@ -154,28 +171,14 @@
             z-index: 1000;
         }
 
-        .search-box {
-            display: flex;
-            align-items: center;
+        .search-info {
             background-color: var(--sygic-bg);
             padding: 12px 15px;
             border-radius: 30px;
             border: 1px solid #d1d8e0;
-        }
-
-        .search-icon {
-            width: 18px;
-            height: 18px;
-            margin-right: 10px;
-            opacity: 0.5;
-        }
-
-        .search-box input {
-            border: none;
-            background: none;
-            outline: none;
-            font-size: 16px;
-            width: 100%;
+            font-size: 14px;
+            color: var(--text-light);
+            text-align: center;
         }
 
         .bottom-controls {
@@ -221,7 +224,7 @@
             margin-top: -2px;
         }
 
-        /* Pino customizado */
+        /* Pino customizado mapa */
         .custom-pin {
             width: 30px;
             height: 30px;
@@ -249,111 +252,119 @@
         
         <header class="sygic-header">
             <h1>Sygic GPS</h1>
-            <span class="offline-badge">Offline Mode</span>
+            <span class="offline-badge">Point A to B</span>
         </header>
 
         <div id="map">
             <div class="nav-banner">
                 <div class="nav-icon">➔</div>
                 <div class="nav-instruction">
-                    <div class="street">Vire à direita na Av. Central</div>
-                    <div class="distance">350 m</div>
+                    <div class="street">Clique no mapa: Ponto A (Partida)</div>
+                    <div class="distance" style="font-size:14px;">Aguardando coordenadas...</div>
                 </div>
             </div>
         </div>
 
         <footer class="sygic-footer">
-            <div class="search-box">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" placeholder="Para onde vamos?">
+            <div class="search-info">
+                Dica: 1º Clique = Origem (A) | 2º Clique = Destino (B)
             </div>
 
             <div class="bottom-controls">
                 <div class="speed-limit">
-                    80
+                    00
                     <span>km/h</span>
                 </div>
-                <button class="btn-action">Iniciar Rota</button>
+                <button class="btn-action" onclick="limparRota()">Limpar Rota</button>
             </div>
         </footer>
 
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     
     <script>
-        // --- 1. REGISTRO DO SERVICE WORKER (Para funcionamento OFFLINE) ---
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('data:text/javascript,' + encodeURIComponent(`
-                    const CACHE_NAME = 'sygic-maps-v1';
-                    const urlsToCache = [
-                        '/',
-                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-                    ];
-
-                    self.addEventListener('install', event => {
-                        event.waitUntil(
-                            caches.open(CACHE_NAME).then(cache => {
-                                return cache.addAll(urlsToCache).catch(err => console.log('Cache falhou, mas ok.', err));
-                            })
-                        );
-                    });
-
-                    self.addEventListener('fetch', event => {
-                        event.respondWith(
-                            caches.match(event.request).then(response => {
-                                // Se o arquivo estiver em cache, retorna ele. Se não, tenta a rede.
-                                if (response) {
-                                    return response;
-                                }
-                                return fetch(event.request).then(networkResponse => {
-                                    // Salva dinamicamente os pedaços do mapa (tiles) que o usuário navegar para usar offline depois
-                                    if (event.request.url.includes('openstreetmap.org')) {
-                                        caches.open(CACHE_NAME).then(cache => {
-                                            cache.put(event.request, networkResponse.clone());
-                                        });
-                                    }
-                                    return networkResponse;
-                                }).catch(() => {
-                                    // Fallback caso esteja offline e o tile não esteja em cache
-                                    return new Response('Modo Offline Ativo');
-                                });
-                            })
-                        );
-                    });
-                `)).then(reg => console.log('Service Worker registrado.', reg))
-                  .catch(err => console.error('Erro no Service Worker.', err));
-            });
-        }
-
-        // --- 2. CARREGAMENTO DO MAPA ---
+        // Inicializa o mapa centralizado no Rio de Janeiro (ou sua cidade)
         const map = L.map('map', {
             zoomControl: true
-        }).setView([-23.5555, -46.6555], 15);
+        }).setView([-22.9068, -43.1729], 13);
 
-        // Camada de mapa base com o OpenStreetMap
+        // Camada base do mapa
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Pino customizado
-        const sygicIcon = L.divIcon({
-            className: 'custom-pin',
-            iconSize: [30, 30],
-            iconAnchor: [15, 30],
-            popupAnchor: [0, -30]
+        let pontoA = null;
+        let pontoB = null;
+        let controlRouting = null;
+
+        const bannerInstrucao = document.querySelector('.nav-instruction .street');
+        const bannerDistancia = document.querySelector('.nav-instruction .distance');
+
+        // Função para criar o pino estilizado da Sygic
+        function criarPinoSygic() {
+            return L.divIcon({
+                className: 'custom-pin',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30],
+                popupAnchor: [0, -30]
+            });
+        }
+
+        // Sistema de Click no Mapa (Ponto A e Ponto B)
+        map.on('click', function(e) {
+            const clickLatLong = e.latlng;
+
+            if (!pontoA) {
+                // Definir Ponto A
+                pontoA = clickLatLong;
+                bannerInstrucao.innerText = "Ponto B (Destino) definido em seguida";
+                bannerDistancia.innerText = "Aguardando...";
+                L.marker(pontoA, { icon: criarPinoSygic() }).addTo(map).bindPopup("<b>Ponto A (Partida)</b>").openPopup();
+            } else if (!pontoB) {
+                // Definir Ponto B
+                pontoB = clickLatLong;
+                bannerInstrucao.innerText = "Calculando rota...";
+                bannerDistancia.innerText = "Sygic GPS";
+                
+                L.marker(pontoB, { icon: criarPinoSygic() }).addTo(map).bindPopup("<b>Ponto B (Destino)</b>").openPopup();
+
+                // Desenhar a linha de rota entre A e B usando o plugin de roteamento
+                controlRouting = L.Routing.control({
+                    waypoints: [
+                        L.latLng(pontoA.lat, pontoA.lng),
+                        L.latLng(pontoB.lat, pontoB.lng)
+                    ],
+                    routeWhileDragging: false,
+                    showAlternatives: false,
+                    addWaypoints: false,
+                    fitSelectedRoutes: true,
+                    language: 'pt-BR',
+                    lineOptions: {
+                        styles: [{ color: '#0066cc', opacity: 0.8, weight: 6 }]
+                    }
+                }).addTo(map);
+
+                // Listener que atualiza o banner com base nas instruções de trajeto dadas pela rota
+                controlRouting.on('routesfound', function(e) {
+                    const routes = e.routes;
+                    const summary = routes[0].summary;
+                    // Converter metros para km se necessário
+                    const distanciaMetros = summary.totalDistance;
+                    const textoDistancia = distanciaMetros > 1000 ? (distanciaMetros/1000).toFixed(1) + " km" : distanciaMetros + " m";
+                    
+                    bannerInstrucao.innerText = "Siga em frente na rota calculada";
+                    bannerDistancia.innerText = textoDistancia;
+                });
+            }
         });
 
-        L.marker([-23.5555, -46.6555], { icon: sygicIcon }).addTo(map)
-            .bindPopup("<b>Sygic GPS (Offline)</b><br/>Navegação pronta.");
+        // Botão de Limpar Rota
+        function limparRota() {
+            // Recarrega a página para limpar marcadores, rotas e reiniciar estados com facilidade
+            location.reload();
+        }
 
         setTimeout(function() {
             map.invalidateSize();

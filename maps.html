@@ -246,12 +246,23 @@
     </div>
     
     <script>
-        // Inicializa o mapa com estilo vetorial "Protomaps Basemaps" otimizado para rodar localmente e offline.
+        // Inicializa o mapa com estilo vetorial e tradução de nomes de lugares para o português brasileiro (localidades, rótulos e cidades em pt-BR)
         const map = new maplibregl.Map({
             container: 'map',
             style: 'https://basemaps.protomaps.com/styles/protomaps-bright.json', 
             center: [-43.1729, -22.9068], // Coordenadas iniciais (Rio de Janeiro)
             zoom: 12
+        });
+
+        // Força a linguagem do mapa/rótulos para português se suportado pelo provedor de estilo
+        map.on('style.load', () => {
+            try {
+                map.setLayoutProperty('place-label', 'text-field', ['get', 'name_pt'] || ['get', 'name']);
+                map.setLayoutProperty('state-label', 'text-field', ['get', 'name_pt'] || ['get', 'name']);
+                map.setLayoutProperty('country-label', 'text-field', ['get', 'name_pt'] || ['get', 'name']);
+            } catch(e) {
+                // Fallback silencioso para estilos que gerenciam idiomas nativamente
+            }
         });
 
         let markerA = null;

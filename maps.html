@@ -3,290 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Navegador de Rotas - 100% Offline</title>
-    
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
+    <title>Gerenciador de Coordenadas Offline</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+            color: #333;
         }
-
-        body, html {
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        #map {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            background-color: #e5e3df;
-        }
-
-        .side-panel {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
             background: white;
-            width: 380px;
-            max-height: calc(100% - 40px);
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .panel-header {
             padding: 20px;
-            background: #1a73e8;
-            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
-
-        .panel-header h2 {
-            font-size: 18px;
+        .form-group {
             margin-bottom: 15px;
         }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .input-field {
-            display: flex;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 8px 12px;
-            border-radius: 4px;
-        }
-
-        .input-field span {
-            margin-right: 10px;
-            font-size: 14px;
-        }
-
-        .input-field input {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: white;
-            width: 100%;
-            font-size: 15px;
-        }
-
-        .input-field input::placeholder {
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 5px;
-        }
-
-        .btn-route {
-            flex: 2;
-            background: #ffd600;
-            color: #333;
-            border: none;
-            padding: 10px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 5px;
-            transition: background 0.2s;
-        }
-
-        .btn-route:hover {
-            background: #e6c000;
-        }
-
-        .btn-download {
-            background: #202124;
-            color: white;
-            border: none;
-            padding: 10px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 5px;
-            font-size: 12px;
-        }
-
-        .results {
-            padding: 20px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #eee;
-            display: none;
-        }
-
-        .results h3 {
-            font-size: 22px;
-            color: #1e7e34;
+        label {
+            display: block;
             margin-bottom: 5px;
+            font-weight: bold;
         }
-
-        .results p {
-            color: #555;
-            font-size: 14px;
-            margin-top: 4px;
-        }
-
-        .formula-box {
-            font-family: monospace;
-            background: #e8f0fe;
-            padding: 6px;
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
             border-radius: 4px;
-            margin-top: 8px;
-            font-size: 12px;
-            color: #1967d2;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        li {
+            background: #eee;
+            margin-bottom: 5px;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
         }
     </style>
 </head>
 <body>
 
-    <div class="side-panel">
-        <div class="panel-header">
-            <h2>Navegador Offline (Fórmula V=D/T)</h2>
-            <div class="input-group">
-                <div class="input-field">
-                    <span>🟢</span>
-                    <input type="text" id="start" placeholder="Partida (Ex: Lisboa, Madrid, Brasilia)">
-                </div>
-                <div class="input-field">
-                    <span>🔴</span>
-                    <input type="text" id="end" placeholder="Destino (Ex: Paris, Tokyo, Cairo)">
-                </div>
-                <div class="input-field">
-                    <span>⚡</span>
-                    <input type="number" id="speed" placeholder="Velocidade Média (km/h)" value="80">
-                </div>
-                <div class="btn-group">
-                    <button class="btn-route" onclick="calcularRotaOffline()">Calcular Rota</button>
-                </div>
-                <button class="btn-download" onclick="downloadCidadesObjeto()">💾 Baixar Lista de Cidades (JSON)</button>
-            </div>
-        </div>
-
-        <div class="results" id="results-panel">
-            <h3 id="trip-time">0 min</h3>
-            <p id="trip-distance">📍 Distância: 0 km</p>
-            <div class="formula-box" id="trip-formula"></div>
-        </div>
+<div class="container">
+    <h2>Salvar Cidade (Offline)</h2>
+    
+    <div class="form-group">
+        <label for="cidade">Nome da Cidade/Local:</label>
+        <input type="text" id="cidade" placeholder="Ex: São Paulo">
     </div>
+    
+    <div class="form-group">
+        <label for="latitude">Latitude:</label>
+        <input type="number" id="latitude" step="any" placeholder="Ex: -23.55052">
+    </div>
+    
+    <div class="form-group">
+        <label for="longitude">Longitude:</label>
+        <input type="number" id="longitude" step="any" placeholder="Ex: -46.633308">
+    </div>
+    
+    <button onclick="salvarLocalizacao()">Salvar no Banco de Dados</button>
 
-    <div id="map"></div>
+    <h3>Cidades Salvas:</h3>
+    <ul id="listaCidades"></ul>
+</div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let db;
 
-    <script>
-        // Banco de dados geográfico interno (Offline) - Você pode expandir adicionando mais cidades aqui
-        const BANCO_CIDADES = {
-            "lisboa": { nome: "Lisboa", lat: 38.7223, lon: -9.1393 },
-            "madrid": { nome: "Madrid", lat: 40.4168, lon: -3.7038 },
-            "paris": { nome: "Paris", lat: 48.8566, lon: 2.3522 },
-            "londres": { nome: "Londres", lat: 51.5074, lon: -0.1278 },
-            "brasilia": { nome: "Brasília", lat: -15.7938, lon: -47.8828 },
-            "tokyo": { nome: "Tokyo", lat: 35.6762, lon: 139.6503 },
-            "cairo": { nome: "Cairo", lat: 30.0444, lon: 31.2357 },
-            "nova york": { nome: "Nova York", lat: 40.7128, lon: -74.0060 },
-            "buenos aires": { nome: "Buenos Aires", lat: -34.6037, lon: -58.3816 }
-        };
+    // 1. Inicializa o Banco de Dados IndexedDB (Nativo do Navegador e Offline)
+    const request = indexedDB.open("MapaOfflineDB", 1);
 
-        const map = L.map('map').setView([20, 0], 3);
+    request.onupgradeneeded = function(event) {
+        db = event.target.result;
+        // Cria uma tabela chamada "cidades" com uma chave auto-incrementável
+        db.createObjectStore("cidades", { keyPath: "id", autoIncrement: true });
+    };
 
-        // Tenta carregar o mapa visual se houver conexão. Se não houver, a lógica offline continua funcionando.
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+    request.onsuccess = function(event) {
+        db = event.target.result;
+        exibirCidades(); // Mostra os dados já salvos assim que carrega a página
+    };
 
-        let rotaLayer = null;
+    request.onerror = function(event) {
+        console.error("Erro ao abrir o banco de dados:", event.target.errorCode);
+    };
 
-        // Função Matemática de Haversine para calcular distância entre duas coordenadas (linha reta global)
-        function calcularDistanciaHaversine(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Raio da Terra em km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c; 
+    // 2. Função para salvar os dados digitados
+    function salvarLocalizacao() {
+        const cidade = document.getElementById('cidade').value;
+        const lat = parseFloat(document.getElementById('latitude').value);
+        const lng = parseFloat(document.getElementById('longitude').value);
+
+        if (!cidade || isNaN(lat) || isNaN(lng)) {
+            alert("Por favor, preencha todos os campos corretamente.");
+            return;
         }
 
-        function calcularRotaOffline() {
-            const partidaInput = document.getElementById('start').value.toLowerCase().trim();
-            const destinoInput = document.getElementById('end').value.toLowerCase().trim();
-            const velocidade = parseFloat(document.getElementById('speed').value);
+        const novoRegistro = { nome: cidade, latitude: lat, longitude: lng };
 
-            if (!partidaInput || !destinoInput || !velocidade || velocidade <= 0) {
-                alert("Por favor, insira a partida, destino e uma velocidade válida.");
-                return;
-            }
+        // Cria uma transação de escrita no banco de dados
+        const transaction = db.transaction(["cidades"], "readwrite");
+        const store = transaction.objectStore("cidades");
+        
+        const addRequest = store.add(novoRegistro);
 
-            const cidadeOrigem = BANCO_CIDADES[partidaInput];
-            const cidadeDestino = BANCO_CIDADES[destinoInput];
-
-            if (!cidadeOrigem || !cidadeDestino) {
-                alert(`Cidade não encontrada no banco offline.\nCidades disponíveis no exemplo: ${Object.keys(BANCO_CIDADES).join(', ')}`);
-                return;
-            }
-
-            // Limpa rotas anteriores do mapa
-            if (rotaLayer) map.removeLayer(rotaLayer);
-
-            // 1. Calcula a Distância
-            const distanciaKm = calcularDistanciaHaversine(cidadeOrigem.lat, cidadeOrigem.lon, cidadeDestino.lat, cidadeDestino.lon);
-
-            // 2. Calcula o Tempo com base na física: Tempo = Distância / Velocidade
-            const tempoHoras = distanciaKm / velocidade;
+        addRequest.onsuccess = function() {
+            // Limpa os campos do formulário
+            document.getElementById('cidade').value = '';
+            document.getElementById('latitude').value = '';
+            document.getElementById('longitude').value = '';
             
-            // Formatação do Tempo para exibição
-            let tempoFormatado = "";
-            if (tempoHoras >= 1) {
-                const horas = Math.floor(tempoHoras);
-                const minutos = Math.round((tempoHoras - horas) * 60);
-                tempoFormatado = `${horas} h ${minutos} min`;
-            } else {
-                const minutos = Math.round(tempoHoras * 60);
-                tempoFormatado = `${minutos} min`;
+            // Atualiza a lista na tela
+            exibirCidades();
+        };
+    }
+
+    // 3. Função para ler o banco de dados e listar na tela
+    function exibirCidades() {
+        const lista = document.getElementById('listaCidades');
+        lista.innerHTML = ''; // Limpa a lista atual na tela
+
+        const transaction = db.transaction(["cidades"], "readonly");
+        const store = transaction.objectStore("cidades");
+        const cursorRequest = store.openCursor();
+
+        cursorRequest.onsuccess = function(event) {
+            const cursor = event.target.result;
+            if (cursor) {
+                const li = document.createElement('li');
+                li.innerHTML = `<strong>${cursor.value.nome}</strong> (Lat: ${cursor.value.latitude}, Lng: ${cursor.value.longitude})`;
+                lista.appendChild(li);
+                
+                cursor.continue(); // Passa para o próximo registro
             }
+        };
+    }
+</script>
 
-            // Exibe os resultados na tela
-            document.getElementById('results-panel').style.display = 'block';
-            document.getElementById('trip-time').innerText = `⏱️ ${tempoFormatado}`;
-            document.getElementById('trip-distance').innerText = `📍 Distância estimada: ${distanciaKm.toFixed(2)} km`;
-            document.getElementById('trip-formula').innerText = `Fórmula aplicada:\nTempo = ${distanciaKm.toFixed(1)} km / ${velocidade} km/h = ${tempoHoras.toFixed(2)} horas`;
-
-            // Desenha a linha offline ligando os pontos no mapa
-            const pontos = [
-                [cidadeOrigem.lat, cidadeOrigem.lon],
-                [cidadeDestino.lat, cidadeDestino.lon]
-            ];
-            rotaLayer = L.polyline(pontos, {color: '#1a73e8', weight: 5}).addTo(map);
-            map.fitBounds(rotaLayer.getBounds());
-        }
-
-        // Função solicitada para fazer o download do mapa/banco de dados das cidades em formato JSON
-        function downloadCidadesObjeto() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(BANCO_CIDADES, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "banco_de_cidades_mundo.json");
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.removeChild(downloadAnchor);
-        }
-    </script>
 </body>
 </html>

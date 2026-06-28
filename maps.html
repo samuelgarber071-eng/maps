@@ -35,7 +35,7 @@
             min-height: 100vh;
         }
 
-        /* Container Principal (Simula a tela do App) */
+        /* Container Principal */
         .sygic-container {
             width: 100%;
             max-width: 450px;
@@ -82,6 +82,7 @@
             flex-grow: 1;
             position: relative;
             z-index: 1;
+            background-color: #aad3df; /* Cor de fundo do oceano enquanto carrega */
         }
 
         /* Banner de Instrução flutuante (HUD Sygic) */
@@ -246,28 +247,39 @@
     </div>
     
     <script>
-        // Inicializa o mapa com estilo vetorial e tradução de nomes de lugares para o português brasileiro (localidades, rótulos e cidades em pt-BR)
+        // Utiliza mapa raster/vetor aberto compatível diretamente com o MapLibre (Estilo OpenStreetMap Standard)
         const map = new maplibregl.Map({
             container: 'map',
-            style: 'https://basemaps.protomaps.com/styles/protomaps-bright.json', 
+            style: {
+                'version': 8,
+                'sources': {
+                    'raster-tiles': {
+                        'type': 'raster',
+                        'tiles': [
+                            'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                        ],
+                        'tileSize': 256,
+                        'attribution': '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    }
+                },
+                'layers': [
+                    {
+                        'id': 'simple-tiles',
+                        'type': 'raster',
+                        'source': 'raster-tiles',
+                        'minzoom': 0,
+                        'maxzoom': 19
+                    }
+                ]
+            },
             center: [-43.1729, -22.9068], // Coordenadas iniciais (Rio de Janeiro)
             zoom: 12
         });
 
-        // Força a linguagem do mapa/rótulos para português se suportado pelo provedor de estilo
-        map.on('style.load', () => {
-            try {
-                map.setLayoutProperty('place-label', 'text-field', ['get', 'name_pt'] || ['get', 'name']);
-                map.setLayoutProperty('state-label', 'text-field', ['get', 'name_pt'] || ['get', 'name']);
-                map.setLayoutProperty('country-label', 'text-field', ['get', 'name_pt'] || ['get', 'name']);
-            } catch(e) {
-                // Fallback silencioso para estilos que gerenciam idiomas nativamente
-            }
-        });
-
         let markerA = null;
         let markerB = null;
-        let routeLineLayer = null;
 
         const bannerInstrucao = document.querySelector('.nav-instruction .street');
         const bannerDistancia = document.querySelector('.nav-instruction .distance');
@@ -323,12 +335,17 @@
                 }
             };
 
-            map.on('load', () => {
-                executarAdicaoRota(routeGeoJSON);
-            });
-            
-            if (map.loaded()) {
-                executarAdicaoRota(routeGeoJSON);
+            // Adiciona ou atualiza a linha no mapa
+            if (map.getSource('route')) {
+                map.getSource('route').setData(routeGeoJSON);
+            } else {
+                map.on('load', () => {
+                    executarAdicaoRota(routeGeoJSON);
+                });
+                
+                if (map.loaded()) {
+                    executarAdicaoRota(routeGeoJSON);
+                }
             }
 
             // Cálculo matemático offline de distância e tempo
@@ -359,29 +376,25 @@
         }
 
         function executarAdicaoRota(geoJSON) {
-            if (map.getSource('route')) {
-                map.getSource('route').setData(geoJSON);
-            } else {
-                map.addSource('route', {
-                    'type': 'geojson',
-                    'data': geoJSON
-                });
+            map.addSource('route', {
+                'type': 'geojson',
+                'data': geoJSON
+            });
 
-                map.addLayer({
-                    'id': 'route',
-                    'type': 'line',
-                    'source': 'route',
-                    'layout': {
-                        'line-join': 'round',
-                        'line-cap': 'round'
-                    },
-                    'paint': {
-                        'line-color': '#0066cc', // Cor azul do tema Sygic
-                        'line-width': 8,
-                        'line-opacity': 0.8
-                    }
-                });
-            }
+            map.addLayer({
+                'id': 'route',
+                'type': 'line',
+                'source': 'route',
+                'layout': {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                'paint': {
+                    'line-color': '#0066cc', // Cor azul do tema Sygic
+                    'line-width': 8,
+                    'line-opacity': 0.8
+                }
+            });
             
             const bounds = [
                 [Math.min(markerA.getLngLat().lng, markerB.getLngLat().lng), Math.min(markerA.getLngLat().lat, markerB.getLngLat().lat)],

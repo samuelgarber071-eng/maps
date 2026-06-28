@@ -3,137 +3,426 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Distância Offline - Cidades</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <title>Navegador de Rotas - Offline & Banco de Dados</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
-    <div class="max-w-xl w-full bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-        
-        <div class="text-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">🌍 Calculadora de Distância Offline</h1>
-            <p class="text-gray-600 text-sm">Selecione uma cidade de origem e uma de destino na lista abaixo para calcular a distância em linha reta.</p>
-        </div>
-
-        <div class="space-y-6">
-            
-            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <label for="select-origem" class="block font-semibold text-gray-700 mb-2 text-sm uppercase tracking-wider">📍 Cidade de Origem</label>
-                <select id="select-origem" class="w-full px-3 py-3 border border-gray-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="" disabled selected>Selecione a origem...</option>
-                </select>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <label for="select-destino" class="block font-semibold text-gray-700 mb-2 text-sm uppercase tracking-wider">🏁 Cidade de Destino</label>
-                <select id="select-destino" class="w-full px-3 py-3 border border-gray-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="" disabled selected>Selecione o destino...</option>
-                </select>
-            </div>
-
-            <button onclick="calcularDistanciaCidades()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition shadow-lg shadow-blue-500/20 cursor-pointer">
-                Calcular Distância
-            </button>
-        </div>
-
-        <div id="erro" class="mt-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg hidden">
-            <p class="text-red-700 font-medium text-sm" id="mensagem-erro">Selecione cidades válidas na lista.</p>
-        </div>
-
-        <div id="resultado" class="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-100 text-center hidden">
-            <span class="block text-sm text-blue-600 font-medium">Distância em linha reta</span>
-            <span id="res-distancia" class="text-3xl font-extrabold text-blue-900 block mt-1"></span>
-            <span class="block text-xs text-blue-500 mt-2">Cálculo baseado na curvatura da Terra (Fórmula de Haversine)</span>
-        </div>
-
-    </div>
-
-    <script>
-        // Banco de dados interno (adicione ou remova cidades e coordenadas aqui)
-        const bancoDeCidades = [
-            { nome: "São Paulo, Brasil", lat: -23.5505, lon: -46.6333 },
-            { nome: "Rio de Janeiro, Brasil", lat: -22.9068, lon: -43.1729 },
-            { nome: "Brasília, Brasil", lat: -15.7975, lon: -47.8919 },
-            { nome: "Salvador, Brasil", lat: -12.9714, lon: -38.5014 },
-            { nome: "Lisboa, Portugal", lat: 38.7223, lon: -9.1393 },
-            { nome: "Porto, Portugal", lat: 41.1579, lon: -8.6291 },
-            { nome: "Londres, Reino Unido", lat: 51.5074, lon: -0.1278 },
-            { nome: "Paris, França", lat: 48.8566, lon: 2.3522 },
-            { nome: "Madri, Espanha", lat: 40.4168, lon: -3.7038 },
-            { nome: "Roma, Itália", lat: 41.9028, lon: 12.4964 },
-            { nome: "Nova York, EUA", lat: 40.7128, lon: -74.0060 },
-            { nome: "Tóquio, Japão", lat: 35.6762, lon: 139.6503 },
-            { nome: "Buenos Aires, Argentina", lat: -34.6037, lon: -58.3816 },
-            { nome: "Bogotá, Colômbia", lat: 4.7110, lon: -74.0721 },
-            { nome: "Cidade do México, México", lat: 19.4326, lon: -99.1332 },
-            { nome: "Luanda, Angola", lat: -8.8384, lon: 13.2344 },
-            { nome: "Maputo, Moçambique", lat: -25.8839, lon: 32.5839 }
-        ];
-
-        // Preenche os seletores HTML ao carregar a página
-        document.addEventListener("DOMContentLoaded", () => {
-            const selectOrigem = document.getElementById('select-origem');
-            const selectDestino = document.getElementById('select-destino');
-
-            // Ordena as cidades alfabeticamente para facilitar a busca
-            bancoDeCidades.sort((a, b) => a.nome.localeCompare(b.nome));
-
-            bancoDeCidades.forEach((cidade, index) => {
-                const option1 = document.createElement('option');
-                option1.value = index;
-                option1.text = cidade.nome;
-                selectOrigem.appendChild(option1);
-
-                const option2 = document.createElement('option');
-                option2.value = index;
-                option2.text = cidade.nome;
-                selectDestino.appendChild(option2);
-            });
-        });
-
-        // Fórmula matemática para calcular a distância esférica
-        function calcularHaversine(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Raio médio da Terra em km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                      
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        function calcularDistanciaCidades() {
-            const indiceOrigem = document.getElementById('select-origem').value;
-            const indiceDestino = document.getElementById('select-destino').value;
-            const erroDiv = document.getElementById('erro');
-            const resultadoDiv = document.getElementById('resultado');
+        body, html {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
 
-            if (indiceOrigem === "" || indiceDestino === "") {
-                erroDiv.classList.remove('hidden');
-                resultadoDiv.classList.add('hidden');
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background-color: #e5e3df; /* Cor de fundo caso esteja sem internet */
+        }
+
+        .side-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: white;
+            width: 380px;
+            max-height: calc(100% - 40px);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 20px;
+            background: #1a73e8;
+            color: white;
+        }
+
+        .panel-header h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .input-field {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        .input-field span {
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        .input-field input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        .input-field input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-route {
+            flex: 2;
+            background: #ffd600;
+            color: #333;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: background 0.2s;
+        }
+
+        .btn-route:hover {
+            background: #e6c000;
+        }
+
+        .btn-save {
+            flex: 1;
+            background: #34a853;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: background 0.2s;
+        }
+
+        .btn-save:hover {
+            background: #2d8e47;
+        }
+
+        .results {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: none;
+        }
+
+        .results h3 {
+            font-size: 22px;
+            color: #1e7e34;
+            margin-bottom: 5px;
+        }
+
+        .results p {
+            color: #555;
+            font-size: 14px;
+        }
+
+        /* Seção do Banco de Dados Local */
+        .db-panel {
+            padding: 15px;
+            background: #fff;
+            border-top: 2px solid #1a73e8;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .db-panel h4 {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .city-list {
+            list-style: none;
+        }
+
+        .city-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: #f1f3f4;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .city-item button {
+            background: #ea4335;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .city-name {
+            cursor: pointer;
+            color: #1a73e8;
+            font-weight: 500;
+        }
+
+        .city-name:hover {
+            text-decoration: underline;
+        }
+
+        .leaflet-routing-container {
+            width: 100% !important;
+            padding: 10px !important;
+            background: white !important;
+            border: none !important;
+            box-shadow: none !important;
+            overflow-y: auto;
+            max-height: 200px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="side-panel">
+        <div class="panel-header">
+            <h2>Planejar Rota</h2>
+            <div class="input-group">
+                <div class="input-field">
+                    <span>🟢</span>
+                    <input type="text" id="start" placeholder="Ponto de partida">
+                </div>
+                <div class="input-field">
+                    <span>🔴</span>
+                    <input type="text" id="end" placeholder="Destino">
+                </div>
+                <div class="btn-group">
+                    <button class="btn-route" onclick="calcularRota()">Traçar Rota</button>
+                    <button class="btn-save" onclick="salvarCidadesAtuais()" title="Salvar essas cidades">💾 Salvar</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="results" id="results-panel">
+            <h3 id="trip-time">0 min</h3>
+            <p id="trip-distance">📍 0 km</p>
+        </div>
+
+        <div id="instructions" style="overflow-y: auto; flex-grow: 1;"></div>
+
+        <div class="db-panel">
+            <h4>📌 Cidades Salvas (Offline)</h4>
+            <ul id="city-list" class="city-list">
+                </ul>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <script>
+        // Inicializa o mapa
+        const map = L.map('map').setView([20, 0], 3);
+
+        // Mapa Base (Só vai carregar se tiver internet, senão mostra o fundo cinza estável)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 20
+        }).addTo(map);
+
+        let camadaFronteiras;
+
+        // Carrega as fronteiras (Garante que se falhar por estar offline, o app continua funcionando)
+        fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+            .then(response => response.json())
+            .then(data => {
+                camadaFronteiras = L.geoJSON(data, {
+                    style: function(feature) {
+                        return { color: '#000000', weight: 2.5, opacity: 0.7, fillColor: 'transparent' };
+                    }
+                }).addTo(map);
+            }).catch(e => console.log("Modo Offline: Fronteiras externas não carregadas."));
+
+        let controlRoteamento;
+
+        // --- SISTEMA DE BANCO DE DADOS LOCAL (LocalStorage) ---
+        
+        // Carrega as cidades salvas assim que a página abre
+        document.addEventListener("DOMContentLoaded", atualizarListaCidades);
+
+        function obterBancoDados() {
+            const dados = localStorage.getItem("cidades_salvas");
+            return dados ? JSON.parse(dados) : [];
+        }
+
+        function salvarCidadesAtuais() {
+            const partida = document.getElementById('start').value.trim();
+            const destino = document.getElementById('end').value.trim();
+
+            if (!partida && !destino) {
+                alert("Digite pelo menos uma cidade para salvar.");
                 return;
             }
 
-            if (indiceOrigem === indiceDestino) {
-                document.getElementById('mensagem-erro').innerText = "A origem e o destino não podem ser a mesma cidade.";
-                erroDiv.classList.remove('hidden');
-                resultadoDiv.classList.add('hidden');
+            let bd = obterBancoDados();
+            
+            if (partida && !bd.includes(partida)) bd.push(partida);
+            if (destino && !bd.includes(destino)) bd.push(destino);
+
+            localStorage.setItem("cidades_salvas", JSON.stringify(bd));
+            atualizarListaCidades();
+        }
+
+        function atualizarListaCidades() {
+            const lista = document.getElementById("city-list");
+            lista.innerHTML = "";
+            const bd = obterBancoDados();
+
+            if (bd.length === 0) {
+                lista.innerHTML = "<li style='color:#888; font-size:12px;'>Nenhuma cidade salva ainda.</li>";
                 return;
             }
 
-            erroDiv.classList.add('hidden');
+            bd.forEach((cidade, index) => {
+                const li = document.createElement("li");
+                li.className = "city-item";
+                li.innerHTML = `
+                    <span class="city-name" onclick="usarCidade('${cidade}')">🏙️ ${cidade}</span>
+                    <button onclick="deletarCidade(${index})">X</button>
+                `;
+                lista.appendChild(li);
+            });
+        }
 
-            const cidade1 = bancoDeCidades[indiceOrigem];
-            const cidade2 = bancoDeCidades[indiceDestino];
+        function deletarCidade(index) {
+            let bd = obterBancoDados();
+            bd.splice(index, 1);
+            localStorage.setItem("cidades_salvas", JSON.stringify(bd));
+            atualizarListaCidades();
+        }
 
-            // Executa o cálculo matemático local
-            const distancia = calcularHaversine(cidade1.lat, cidade1.lon, cidade2.lat, cidade2.lon);
+        function usarCidade(cidade) {
+            // Preenche o campo que estiver vazio, priorizando a partida
+            const start = document.getElementById('start');
+            const end = document.getElementById('end');
 
-            // Exibe o resultado na tela
-            document.getElementById('res-distancia').innerText = `${distancia.toFixed(2)} km`;
-            resultadoDiv.classList.remove('hidden');
+            if (!start.value) {
+                start.value = cidade;
+            } else if (!end.value) {
+                end.value = cidade;
+            } else {
+                start.value = cidade; // Se ambos cheios, reseta o start
+            }
+        }
+
+        // --- MÉTODOS DE BUSCA E ROTA ---
+
+        async function buscarCoordenadas(local) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&accept-language=pt-BR,pt&q=${encodeURIComponent(local)}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data && data.length > 0) {
+                    return L.latLng(data[0].lat, data[0].lon);
+                }
+            } catch (error) {
+                console.error("Erro de conexão ao buscar coordenadas.");
+            }
+            return null;
+        }
+
+        async function calcularRota() {
+            const partidaTexto = document.getElementById('start').value;
+            const destinoTexto = document.getElementById('end').value;
+
+            if (!partidaTexto || !destinoTexto) {
+                alert("Por favor, preencha o ponto de partida e o destino.");
+                return;
+            }
+
+            if (!navigator.onLine) {
+                alert("Você está offline. O cálculo de rotas precisa de conexão com a internet.");
+                return;
+            }
+
+            const pontoPartida = await buscarCoordenadas(partidaTexto);
+            const pontoDestino = await buscarCoordenadas(destinoTexto);
+
+            if (!pontoPartida || !pontoDestino) {
+                alert("Não foi possível encontrar um dos locais informados ou você está sem rede.");
+                return;
+            }
+
+            if (controlRoteamento) {
+                map.removeControl(controlRoteamento);
+            }
+
+            controlRoteamento = L.Routing.control({
+                waypoints: [pontoPartida, pontoDestino],
+                router: L.Routing.osrmv1({
+                    language: 'pt-BR', 
+                    serviceUrl: 'https://router.project-osrm.org/route/v1'
+                }),
+                lineOptions: {
+                    styles: [{ color: '#1a73e8', weight: 6 }] 
+                },
+                collapsible: true,
+                containerClassName: 'leaflet-routing-container'
+            }).addTo(map);
+
+            const containerInstrucoes = document.getElementById('instructions');
+            containerInstrucoes.innerHTML = '';
+
+            controlRoteamento.on('routeselected', function(e) {
+                const rota = e.route;
+                const distanciaKm = (rota.summary.totalDistance / 1000).toFixed(1);
+                const tempoTotalMinutos = Math.round(rota.summary.totalTime / 60);
+                
+                let tempoFormatado = "";
+                if (tempoTotalMinutos >= 60) {
+                    const horas = Math.floor(tempoTotalMinutos / 60);
+                    const mins = tempoTotalMinutos % 60;
+                    tempoFormatado = `${horas} h ${mins} min`;
+                } else {
+                    tempoFormatado = `${tempoTotalMinutos} min`;
+                }
+
+                document.getElementById('results-panel').style.display = 'block';
+                document.getElementById('trip-time').innerText = tempoFormatado;
+                document.getElementById('trip-distance').innerText = `🚗 Distância: ${distanciaKm} km`;
+                
+                const painelPadrao = document.querySelector('.leaflet-routing-container');
+                if(painelPadrao) {
+                    containerInstrucoes.appendChild(painelPadrao);
+                }
+            });
         }
     </script>
 </body>

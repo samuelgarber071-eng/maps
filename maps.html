@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sygic - Navegação GPS com Mapa Real</title>
+    <title>Sygic - GPS Offline Mode</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
@@ -34,7 +34,7 @@
             min-height: 100vh;
         }
 
-        /* Container Principal (Simula a tela do App) */
+        /* Container Principal */
         .sygic-container {
             width: 100%;
             max-width: 450px;
@@ -49,7 +49,7 @@
             border: 4px solid var(--sygic-dark-blue);
         }
 
-        /* Barra de Topo (Header) */
+        /* Barra de Topo */
         .sygic-header {
             background-color: var(--sygic-blue);
             color: white;
@@ -66,30 +66,25 @@
             letter-spacing: 0.5px;
         }
 
-        .menu-icon {
-            width: 24px;
-            height: 18px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            cursor: pointer;
+        /* Indicador de Modo Offline */
+        .offline-badge {
+            background-color: var(--sygic-green);
+            color: var(--sygic-dark-blue);
+            font-size: 10px;
+            font-weight: bold;
+            padding: 3px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
         }
 
-        .menu-icon span {
-            display: block;
-            height: 3px;
-            background-color: white;
-            border-radius: 2px;
-        }
-
-        /* Área do Mapa (Interativo) */
+        /* Área do Mapa */
         #map {
             flex-grow: 1;
             position: relative;
             z-index: 1;
         }
 
-        /* Customização dos controles do Leaflet para parecer com o tema */
+        /* Customização dos controles do Leaflet */
         .leaflet-control-zoom {
             border: none !important;
             border-radius: 10px !important;
@@ -108,7 +103,7 @@
             background-color: var(--sygic-blue) !important;
         }
 
-        /* Indicador de Direção / Navegação (HUD/Banner) */
+        /* Banner de Navegação */
         .nav-banner {
             position: absolute;
             top: 20px;
@@ -148,7 +143,7 @@
             color: var(--sygic-green);
         }
 
-        /* Painel Inferior (Barra de Controle) */
+        /* Painel Inferior */
         .sygic-footer {
             background-color: white;
             padding: 20px;
@@ -226,7 +221,7 @@
             margin-top: -2px;
         }
 
-        /* Custom Marker - Estilo pino de mapa (Pin Sygic) */
+        /* Pino customizado */
         .custom-pin {
             width: 30px;
             height: 30px;
@@ -253,12 +248,8 @@
     <div class="sygic-container">
         
         <header class="sygic-header">
-            <h1>Sygic GPS Navigation</h1>
-            <div class="menu-icon">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
+            <h1>Sygic GPS</h1>
+            <span class="offline-badge">Offline Mode</span>
         </header>
 
         <div id="map">
@@ -285,7 +276,6 @@
                     80
                     <span>km/h</span>
                 </div>
-
                 <button class="btn-action">Iniciar Rota</button>
             </div>
         </footer>
@@ -295,18 +285,66 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
     <script>
-        // Inicializa o mapa centralizado em uma coordenada (ex: Avenida Paulista, São Paulo)
-        // A Sygic utiliza bases de dados de parceiros como TomTom e OpenStreetMap
+        // --- 1. REGISTRO DO SERVICE WORKER (Para funcionamento OFFLINE) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('data:text/javascript,' + encodeURIComponent(`
+                    const CACHE_NAME = 'sygic-maps-v1';
+                    const urlsToCache = [
+                        '/',
+                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+                        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                        'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                    ];
+
+                    self.addEventListener('install', event => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME).then(cache => {
+                                return cache.addAll(urlsToCache).catch(err => console.log('Cache falhou, mas ok.', err));
+                            })
+                        );
+                    });
+
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(
+                            caches.match(event.request).then(response => {
+                                // Se o arquivo estiver em cache, retorna ele. Se não, tenta a rede.
+                                if (response) {
+                                    return response;
+                                }
+                                return fetch(event.request).then(networkResponse => {
+                                    // Salva dinamicamente os pedaços do mapa (tiles) que o usuário navegar para usar offline depois
+                                    if (event.request.url.includes('openstreetmap.org')) {
+                                        caches.open(CACHE_NAME).then(cache => {
+                                            cache.put(event.request, networkResponse.clone());
+                                        });
+                                    }
+                                    return networkResponse;
+                                }).catch(() => {
+                                    // Fallback caso esteja offline e o tile não esteja em cache
+                                    return new Response('Modo Offline Ativo');
+                                });
+                            })
+                        );
+                    });
+                `)).then(reg => console.log('Service Worker registrado.', reg))
+                  .catch(err => console.error('Erro no Service Worker.', err));
+            });
+        }
+
+        // --- 2. CARREGAMENTO DO MAPA ---
         const map = L.map('map', {
             zoomControl: true
         }).setView([-23.5555, -46.6555], 15);
 
-        // Adiciona a camada de azulejos (tiles) do OpenStreetMap / Mapas de base
+        // Camada de mapa base com o OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Ícone customizado simulando o pino do aplicativo Sygic
+        // Pino customizado
         const sygicIcon = L.divIcon({
             className: 'custom-pin',
             iconSize: [30, 30],
@@ -314,11 +352,9 @@
             popupAnchor: [0, -30]
         });
 
-        // Adiciona o marcador (veículo/posição atual) no centro do mapa
         L.marker([-23.5555, -46.6555], { icon: sygicIcon }).addTo(map)
-            .bindPopup("<b>Sygic GPS</b><br/>Sua localização atual.");
+            .bindPopup("<b>Sygic GPS (Offline)</b><br/>Navegação pronta.");
 
-        // Ajuste fino para evitar problemas de redimensionamento do mapa no container flexbox
         setTimeout(function() {
             map.invalidateSize();
         }, 100);
